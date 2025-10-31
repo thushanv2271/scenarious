@@ -1,0 +1,206 @@
+{
+    "type": "object",
+    "properties": {
+        "step1": {
+            "type": "object",
+            "properties": {
+                "impairmentType": {
+                    "type": "string",
+                    "enum": [
+                        "Collective",
+                        "Individual"
+                    ]
+                }
+            },
+            "required": [
+                "impairmentType"
+            ]
+        },
+        "step2": {
+            "type": "object"
+        },
+        "step3": {
+            "type": "object"
+        },
+        "step4": {
+            "anyOf": [
+                {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "latestFinancialYearEnd": {
+                            "type": "string",
+                            "format": "date"
+                        },
+                        "frequency": {
+                            "type": "string",
+                            "enum": [
+                                "Yearly",
+                                "Monthly",
+                                "Quarterly"
+                            ]
+                        },
+                        "timePeriod": {
+                            "type": "object",
+                            "properties": {
+                                "start": {
+                                    "type": "string"
+                                },
+                                "end": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "start",
+                                "end"
+                            ]
+                        },
+                        "excludedPeriods": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "quarterDefinitions": {
+                            "type": "object",
+                            "properties": {
+                                "Q1": {
+                                    "$ref": "#/definitions/quarterPeriod"
+                                },
+                                "Q2": {
+                                    "$ref": "#/definitions/quarterPeriod"
+                                },
+                                "Q3": {
+                                    "$ref": "#/definitions/quarterPeriod"
+                                },
+                                "Q4": {
+                                    "$ref": "#/definitions/quarterPeriod"
+                                }
+                            }
+                        }
+                    },
+                    "required": [
+                        "latestFinancialYearEnd",
+                        "frequency",
+                        "timePeriod"
+                    ],
+                    "allOf": [
+                        {
+                            "if": {
+                                "properties": {
+                                    "frequency": {
+                                        "const": "Yearly"
+                                    }
+                                }
+                            },
+                            "then": {
+                                "properties": {
+                                    "timePeriod": {
+                                        "properties": {
+                                            "start": {
+                                                "pattern": "^\\d{4}$"
+                                            },
+                                            "end": {
+                                                "pattern": "^\\d{4}$"
+                                            }
+                                        }
+                                    },
+                                    "excludedPeriods": {
+                                        "items": {
+                                            "pattern": "^\\d{4}$"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "if": {
+                                "properties": {
+                                    "frequency": {
+                                        "const": "Monthly"
+                                    }
+                                }
+                            },
+                            "then": {
+                                "properties": {
+                                    "timePeriod": {
+                                        "properties": {
+                                            "start": {
+                                                "pattern": "^\\d{4}-\\d{2}$"
+                                            },
+                                            "end": {
+                                                "pattern": "^\\d{4}-\\d{2}$"
+                                            }
+                                        }
+                                    },
+                                    "excludedPeriods": {
+                                        "items": {
+                                            "pattern": "^\\d{4}-\\d{2}$"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "if": {
+                                "properties": {
+                                    "frequency": {
+                                        "const": "Quarterly"
+                                    }
+                                }
+                            },
+                            "then": {
+                                "properties": {
+                                    "timePeriod": {
+                                        "properties": {
+                                            "start": {
+                                                "pattern": "^\\d{4}-Q[1-4]$"
+                                            },
+                                            "end": {
+                                                "pattern": "^\\d{4}-Q[1-4]$"
+                                            }
+                                        }
+                                    },
+                                    "excludedPeriods": {
+                                        "items": {
+                                            "pattern": "^\\d{4}-Q[1-4]$"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        "step5": {
+            "type": "object"
+        }
+    },
+    "required": [
+        "step1"
+    ],
+    "definitions": {
+        "quarterPeriod": {
+            "type": "object",
+            "properties": {
+                "start": {
+                    "type": "string",
+                    "pattern": "^\\d{2}-\\d{2}$"
+                },
+                "end": {
+                    "type": "string",
+                    "pattern": "^\\d{2}-\\d{2}$"
+                }
+            },
+            "required": [
+                "start",
+                "end"
+            ]
+        }
+    }
+}

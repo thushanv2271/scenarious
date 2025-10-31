@@ -1,0 +1,19 @@
+{
+    "step1": {
+        "impairmentType": "Collective"
+    },
+    "step2": {},
+    "step3": {},
+    "step4": {
+        "latestFinancialYearEnd": "2025-03-31",
+        "frequency": "Yearly",
+        "timePeriod": {
+            "start": "2021",
+            "end": "2025"
+        },
+        "excludedPeriods": [
+            "2022",
+            "2024"
+        ]
+    }
+}
