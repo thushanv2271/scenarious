@@ -4,6 +4,7 @@ using Application.Abstractions.Configuration;
 using Application.Abstractions.Data;
 using Application.Abstractions.Exporting;
 using Application.Abstractions.Storage;
+using Application.ProductCategories;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
 using Infrastructure.Configuration;
@@ -65,6 +66,9 @@ public static class DependencyInjection
         }
 
         services.AddScoped(typeof(IExportService<>), typeof(ExcelExportService<>));
+
+        // CSV Services
+        services.AddScoped<ICsvParsingService, Services.CsvParsingService>();
 
         return services;
     }

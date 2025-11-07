@@ -10,6 +10,10 @@ internal sealed class ProductCategoryConfiguration : IEntityTypeConfiguration<Pr
     {
         builder.HasKey(p => p.Id);
 
+        builder.Property(p => p.Type)
+            .IsRequired()
+            .HasMaxLength(10);
+
         builder.Property(p => p.Name)
             .IsRequired()
             .HasMaxLength(200);
@@ -20,9 +24,9 @@ internal sealed class ProductCategoryConfiguration : IEntityTypeConfiguration<Pr
         builder.Property(p => p.UpdatedAt)
             .IsRequired();
 
-        builder.HasIndex(p => p.Name)
+        builder.HasIndex(p => new { p.Type, p.Name })
             .IsUnique()
-            .HasDatabaseName("ix_product_categories_name");
+            .HasDatabaseName("ix_product_categories_type_name");
 
         builder.ToTable("product_categories");
     }
