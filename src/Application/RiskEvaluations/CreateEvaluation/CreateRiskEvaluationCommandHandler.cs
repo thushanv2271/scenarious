@@ -94,7 +94,6 @@ internal sealed class CreateRiskEvaluationCommandHandler(
                 EvalDetailId = Guid.NewGuid(),
                 IndicatorId = item.IndicatorId,
                 Value = item.Value,
-                Notes = item.Notes,
                 CreatedAt = dateTimeProvider.UtcNow
             });
         }

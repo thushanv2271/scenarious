@@ -27,11 +27,6 @@ internal sealed class CustomerRiskEvaluationConfiguration
             .HasColumnName("evaluation_date")
             .IsRequired();
 
-        builder.Property(c => c.OverallStatus)
-            .HasColumnName("overall_status")
-            .HasMaxLength(50)
-            .IsRequired();
-
         builder.Property(c => c.EvaluatedBy)
             .HasColumnName("evaluated_by")
             .IsRequired();

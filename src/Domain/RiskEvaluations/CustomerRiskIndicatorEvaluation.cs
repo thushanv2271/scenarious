@@ -11,7 +11,6 @@ public sealed class CustomerRiskIndicatorEvaluation : Entity
     public Guid EvaluationId { get; set; }
     public Guid IndicatorId { get; set; }
     public string Value { get; set; } = "N/A"; // Yes, No, or N/A
-    public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

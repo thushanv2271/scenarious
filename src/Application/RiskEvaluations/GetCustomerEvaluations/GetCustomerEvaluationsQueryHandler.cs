@@ -25,7 +25,6 @@ internal sealed class GetCustomerEvaluationsQueryHandler(
                 EvaluationId = e.EvaluationId,
                 CustomerNumber = e.CustomerNumber,
                 EvaluationDate = e.EvaluationDate,
-                OverallStatus = e.OverallStatus,
                 EvaluatedBy = e.EvaluatedBy,
                 CreatedAt = e.CreatedAt,
                 IndicatorEvaluations = e.IndicatorEvaluations
@@ -36,7 +35,6 @@ internal sealed class GetCustomerEvaluationsQueryHandler(
                         IndicatorDescription = ie.Indicator.Description,
                         Category = ie.Indicator.Category.ToString(),
                         Value = ie.Value,
-                        Notes = ie.Notes
                     })
                     .ToList()
             })

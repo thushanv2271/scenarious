@@ -39,10 +39,6 @@ internal sealed class CreateRiskEvaluationCommandValidator
                 .Must(v => v == "Yes" || v == "No" || v == "N/A")
                 .WithMessage("Value must be 'Yes', 'No', or 'N/A'");
 
-            // Notes optional but has max length
-            item.RuleFor(i => i.Notes)
-                .MaximumLength(1000)
-                .When(i => !string.IsNullOrEmpty(i.Notes));
         });
     }
 }

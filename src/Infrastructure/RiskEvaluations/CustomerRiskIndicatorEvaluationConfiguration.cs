@@ -31,10 +31,6 @@ internal sealed class CustomerRiskIndicatorEvaluationConfiguration
             .HasMaxLength(10)
             .IsRequired(); // Yes / No / N/A
 
-        builder.Property(c => c.Notes)
-            .HasColumnName("notes")
-            .HasMaxLength(1000);
-
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

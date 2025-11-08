@@ -11,5 +11,4 @@ public sealed record IndicatorEvaluationDetail
     public string IndicatorDescription { get; init; } = string.Empty; // Indicator name/description
     public string Category { get; init; } = string.Empty; // Indicator category
     public string Value { get; init; } = string.Empty;  // Yes / No / N/A
-    public string? Notes { get; init; }                 // Optional notes
 }

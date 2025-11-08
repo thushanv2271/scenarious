@@ -11,7 +11,6 @@ public sealed class CustomerRiskEvaluation : Entity
     public Guid EvaluationId { get; set; }
     public string CustomerNumber { get; set; } = string.Empty;
     public DateTime EvaluationDate { get; set; }
-    public string OverallStatus { get; set; } = string.Empty; // e.g., "High Risk", "Low Risk"
     public Guid EvaluatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
