@@ -47,6 +47,12 @@ public static class PermissionRegistry
     };
 
 
+    public static readonly CategoryInfo CategoryEclAnalysis = new CategoryInfo
+    {
+        Category = "EclAnalysis",
+        CategoryName = "ECL Analysis"
+    };
+
     public static readonly CategoryInfo CategoryUsers = new CategoryInfo //General
     {
         Category = "Users",
@@ -79,6 +85,9 @@ public static class PermissionRegistry
     public const string AdminSettingsRolePermissionCreate = "Admin.Settings.RolePermission.Create";
 
     public const string PDSetupAccess = "PD.Setup.Create";
+
+    public const string EclAnalysisAccess = "EclAnalysis.Access";
+    public const string EclAnalysisThresholdCalculation = "EclAnalysis.ThresholdCalculation";
 
     #endregion
 
@@ -120,6 +129,10 @@ public static class PermissionRegistry
             //** PD
             new(PDSetupAccess, "PD Setup Access", PD.Category,PD.CategoryName, "Access to PD setup functionalities"),
 
+            //EclAnalysis
+            new(EclAnalysisAccess, "Access ECL Analysis", CategoryEclAnalysis.Category, CategoryEclAnalysis.CategoryName, "Allows access to ECL Analysis module"),
+            new(EclAnalysisThresholdCalculation, "Calculate Threshold Summaries", CategoryEclAnalysis.Category, CategoryEclAnalysis.CategoryName, "Allows calculation of ECL threshold summaries"),
+            
             //gemeral
             new(UsersAccess, "User Access", CategoryUsers.Category,CategoryUsers.CategoryName, "General user access permissions")
         };

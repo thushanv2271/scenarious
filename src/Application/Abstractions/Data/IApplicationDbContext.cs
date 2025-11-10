@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using Domain.Authentication;
+﻿using Domain.Authentication;
 using Domain.Branches;
 using Domain.EfaConfigs;
 using Domain.Exports;
@@ -11,7 +10,6 @@ using Domain.PasswordResetTokens;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
-using Domain.RiskEvaluations;
 using Domain.RolePermissions;
 using Domain.Roles;
 using Domain.Scenarios;
@@ -20,7 +18,6 @@ using Domain.Todos;
 using Domain.UserRoles;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using SharedKernel;
 
 namespace Application.Abstractions.Data;
@@ -56,11 +53,6 @@ public interface IApplicationDbContext
     DbSet<Segment> Segments { get; }
     DbSet<Industry> Industries { get; }
     DbSet<Scenario> Scenarios { get; }
-
-    DbSet<RiskIndicator> RiskIndicators { get; }
-    DbSet<CustomerRiskEvaluation> CustomerRiskEvaluations { get; }
-    DbSet<CustomerRiskIndicatorEvaluation> CustomerRiskIndicatorEvaluations { get; }
-    DatabaseFacade Database { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

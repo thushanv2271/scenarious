@@ -43,7 +43,7 @@ public static class DependencyInjection
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddTransient<IDomainEventsDispatcher, DomainEventsDispatcher>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
-
+        services.AddSingleton<Application.Abstractions.Caching.IEclThresholdSummaryCache, Infrastructure.Caching.EclThresholdSummaryCache>();
         var appConfiguration = new AppConfiguration(configuration);
         services.AddSingleton<IAppConfiguration>(appConfiguration);
 

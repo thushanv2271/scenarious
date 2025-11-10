@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using Application.Abstractions.Data;
+﻿using Application.Abstractions.Data;
 using Domain.Authentication;
 using Domain.Branches;
 using Domain.EfaConfigs;
@@ -12,7 +11,6 @@ using Domain.PasswordResetTokens;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
-using Domain.RiskEvaluations;
 using Domain.RolePermissions;
 using Domain.Roles;
 using Domain.Scenarios;
@@ -60,11 +58,6 @@ public sealed class ApplicationDbContext(
     public DbSet<Segment> Segments { get; set; }
     public DbSet<Industry> Industries { get; set; }
     public DbSet<Scenario> Scenarios { get; set; }
-
-    public DbSet<RiskIndicator> RiskIndicators => Set<RiskIndicator>();
-    public DbSet<CustomerRiskEvaluation> CustomerRiskEvaluations => Set<CustomerRiskEvaluation>();
-    public DbSet<CustomerRiskIndicatorEvaluation> CustomerRiskIndicatorEvaluations => Set<CustomerRiskIndicatorEvaluation>();
-
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
