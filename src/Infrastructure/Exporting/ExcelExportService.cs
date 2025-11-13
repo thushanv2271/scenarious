@@ -1,5 +1,5 @@
 using Application.Abstractions.Exporting;
-using OfficeOpenXml;
+using ClosedXML.Excel;
 
 namespace Infrastructure.Exporting;
 
@@ -9,15 +9,14 @@ public class ExcelExportService<T> : IExportService<T>
                                           Dictionary<string, Func<T, object>> columnMappings,
                                           CancellationToken cancellationToken)
     {
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-        using var package = new ExcelPackage();
-        ExcelWorksheet worksheet = package.Workbook.Worksheets.Add("Export");
+        using var workbook = new XLWorkbook();
+        IXLWorksheet worksheet = workbook.Worksheets.Add("Export");
 
         // Write headers
         int colIndex = 1;
         foreach (string header in columnMappings.Keys)
         {
-            worksheet.Cells[1, colIndex].Value = header;
+            worksheet.Cell(1, colIndex).Value = header;
             colIndex++;
         }
 
@@ -28,14 +27,16 @@ public class ExcelExportService<T> : IExportService<T>
             colIndex = 1;
             foreach (Func<T, object> map in columnMappings.Values)
             {
-                worksheet.Cells[rowIndex, colIndex].Value = map(item)?.ToString();
+                worksheet.Cell(rowIndex, colIndex).Value = map(item)?.ToString();
                 colIndex++;
             }
             rowIndex++;
         }
 
-        worksheet.Cells.AutoFitColumns();
+        worksheet.Columns().AdjustToContents();
 
-        return await package.GetAsByteArrayAsync(cancellationToken);
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return await Task.FromResult(stream.ToArray());
     }
 }

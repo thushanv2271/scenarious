@@ -1,7 +1,6 @@
 ﻿using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Files;
-using Domain.ProductCategories;
 using Domain.Scenarios;
 using Domain.Segments;
 using Microsoft.EntityFrameworkCore;
@@ -14,31 +13,45 @@ internal sealed class CreateScenarioCommandHandler(
     IDateTimeProvider dateTimeProvider)
     : ICommandHandler<CreateScenarioCommand, CreateScenarioResponse>
 {
+    private const decimal ProbabilityTolerance = 0.01m;
+    private const decimal RequiredProbabilitySum = 100m;
+
     public async Task<Result<CreateScenarioResponse>> Handle(
         CreateScenarioCommand command,
         CancellationToken cancellationToken)
     {
         // Validate probability sum
         decimal totalProbability = command.Scenarios.Sum(s => s.Probability);
-        if (Math.Abs(totalProbability - 100) > 0.01m)
+        if (Math.Abs(totalProbability - RequiredProbabilitySum) > ProbabilityTolerance)
         {
             return Result.Failure<CreateScenarioResponse>(
                 ScenarioErrors.InvalidProbabilitySum);
         }
 
-        // Verify segment exists
-        bool segmentExists = await context.Segments
-            .AnyAsync(s => s.Id == command.SegmentId, cancellationToken);
+        // Verify segment exists and get segment with product category details
+        Segment? segment = await context.Segments
+            .Include(s => s.ProductCategory)
+            .FirstOrDefaultAsync(s => s.Id == command.SegmentId, cancellationToken);
 
-        if (!segmentExists)
+        if (segment is null)
         {
             return Result.Failure<CreateScenarioResponse>(
                 SegmentErrors.NotFound(command.SegmentId));
         }
 
+        // Get product category details
+        Domain.ProductCategories.ProductCategory? productCategory = await context.ProductCategories
+            .FirstOrDefaultAsync(pc => pc.Id == segment.ProductCategoryId, cancellationToken);
+
+        if (productCategory is null)
+        {
+            return Result.Failure<CreateScenarioResponse>(
+                Error.NotFound("ProductCategory.NotFound", "Product category not found"));
+        }
+
         // Check for duplicate scenario names
         var scenarioNames = command.Scenarios.Select(s => s.ScenarioName).ToList();
-        int distinctCount = scenarioNames.Distinct().Count();  // Fixed: Get the count, not the method
+        int distinctCount = scenarioNames.Distinct().Count();
         bool hasDuplicates = scenarioNames.Count != distinctCount;
 
         if (hasDuplicates)
@@ -59,11 +72,12 @@ internal sealed class CreateScenarioCommandHandler(
                 ScenarioErrors.DuplicateScenarioName);
         }
 
-        var scenarioIds = new List<Guid>();
+        var createdScenarios = new List<CreatedScenarioDetailResponse>();
 
         foreach (ScenarioItem item in command.Scenarios)
         {
             Guid? uploadedFileId = null;
+            UploadedFileDetailResponse? uploadedFileDetail = null;
 
             // Create uploaded file if provided
             if (item.UploadFile is not null)
@@ -75,14 +89,25 @@ internal sealed class CreateScenarioCommandHandler(
                     StoredFileName = item.UploadFile.StoredFileName,
                     ContentType = item.UploadFile.ContentType,
                     Size = item.UploadFile.Size,
-                    PhysicalPath = string.Empty, // Not used in this context
-                    PublicUrl = item.UploadFile.Url.ToString(),  // Convert Uri to string
+                    PhysicalPath = string.Empty,
+                    PublicUrl = item.UploadFile.Url.ToString(),
                     UploadedBy = item.UploadFile.UploadedBy,
                     UploadedAt = DateTimeOffset.UtcNow
                 };
 
                 context.UploadedFiles.Add(uploadedFile);
                 uploadedFileId = uploadedFile.Id;
+
+                uploadedFileDetail = new UploadedFileDetailResponse(
+                    uploadedFile.Id,
+                    uploadedFile.OriginalFileName,
+                    uploadedFile.StoredFileName,
+                    uploadedFile.ContentType,
+                    uploadedFile.Size,
+                    new Uri(uploadedFile.PublicUrl),  // Convert string to Uri
+                    uploadedFile.UploadedBy,
+                    uploadedFile.UploadedAt
+                );
             }
 
             // Create scenario
@@ -103,14 +128,33 @@ internal sealed class CreateScenarioCommandHandler(
 
             scenario.Raise(new ScenarioCreatedDomainEvent(scenario.Id));
             context.Scenarios.Add(scenario);
-            scenarioIds.Add(scenario.Id);
+
+            // Add to response list
+            createdScenarios.Add(new CreatedScenarioDetailResponse(
+                scenario.Id,
+                scenario.ScenarioName,
+                scenario.Probability,
+                scenario.ContractualCashFlowsEnabled,
+                scenario.LastQuarterCashFlowsEnabled,
+                scenario.OtherCashFlowsEnabled,
+                scenario.CollateralValueEnabled,
+                uploadedFileDetail,
+                scenario.CreatedAt,
+                scenario.UpdatedAt
+            ));
         }
 
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new CreateScenarioResponse(
             Success: true,
-            Data: new ScenarioData(command.SegmentId, scenarioIds)
+            Data: new ScenarioDataResponse(
+                segment.Id,
+                segment.Name,
+                productCategory.Id,
+                productCategory.Name,
+                createdScenarios
+            )
         ));
     }
 }

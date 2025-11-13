@@ -14,8 +14,9 @@ using Infrastructure.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using OfficeOpenXml;
 using SharedKernel;
+using ClosedXML.Excel;
+using OfficeOpenXml;
 
 namespace Infrastructure.Database.Seeding;
 
@@ -167,7 +168,13 @@ public sealed class DatabaseSeeder(
     {
         logger.LogInformation("Seeding SegmentMaster data...");
 
+        // Debug: Check actual count in database
+        int segmentCount = await context.SegmentMasters.CountAsync(cancellationToken);
+        logger.LogInformation("Current SegmentMaster count in database: {Count}", segmentCount);
+
         bool hasSegments = await context.SegmentMasters.AnyAsync(cancellationToken);
+        logger.LogInformation("SegmentMasters.AnyAsync() returned: {HasSegments}", hasSegments);
+
         if (hasSegments)
         {
             logger.LogInformation("SegmentMaster data already exists, skipping seeding.");
@@ -186,17 +193,16 @@ public sealed class DatabaseSeeder(
             return;
         }
 
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-        using ExcelPackage package = new(excelPath);
-        ExcelWorksheet worksheet = package.Workbook.Worksheets[0];
+        using XLWorkbook workbook = new(excelPath);
+        IXLWorksheet worksheet = workbook.Worksheet(1);
 
         Dictionary<string, List<string>> segmentDict = new();
 
-        int rowCount = worksheet.Dimension.Rows;
+        int rowCount = worksheet.LastRowUsed()?.RowNumber() ?? 1;
         for (int row = 2; row <= rowCount; row++)
         {
-            string segment = worksheet.Cells[row, 1].Text.Trim();
-            string subsegment = worksheet.Cells[row, 2].Text.Trim();
+            string segment = worksheet.Cell(row, 1).GetValue<string>()?.Trim() ?? string.Empty;
+            string subsegment = worksheet.Cell(row, 2).GetValue<string>()?.Trim() ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(segment) || string.IsNullOrWhiteSpace(subsegment))
             {

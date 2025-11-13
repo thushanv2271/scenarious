@@ -12,8 +12,6 @@ public class CategoryInfo
 
 public static class PermissionRegistry
 {
-
-
     #region Category Constants
     public static readonly CategoryInfo CategoryAdminDashboard = new CategoryInfo //Dashboard
     {
@@ -46,8 +44,7 @@ public static class PermissionRegistry
         CategoryName = "PD"
     };
 
-
-    public static readonly CategoryInfo CategoryEclAnalysis = new CategoryInfo
+    public static readonly CategoryInfo CategoryEclAnalysis = new CategoryInfo //ECL Analysis permissions
     {
         Category = "EclAnalysis",
         CategoryName = "ECL Analysis"
@@ -58,10 +55,6 @@ public static class PermissionRegistry
         Category = "Users",
         CategoryName = "Users"
     };
-
-
-
-
     #endregion
 
     #region Admin Permissions
@@ -86,9 +79,10 @@ public static class PermissionRegistry
 
     public const string PDSetupAccess = "PD.Setup.Create";
 
+    //ECL Analysis
     public const string EclAnalysisAccess = "EclAnalysis.Access";
     public const string EclAnalysisThresholdCalculation = "EclAnalysis.ThresholdCalculation";
-
+    public const string EclAnalysisCashFlowManagement = "EclAnalysis.CashFlowManagement";
     #endregion
 
     #region General
@@ -102,39 +96,39 @@ public static class PermissionRegistry
     {
         return new List<PermissionDefinition>
         {
-
             // Admin Permissions
             // **Dashboard
-            new(AdminDashboardRead, "View Dashboard", CategoryAdminDashboard.Category,CategoryAdminDashboard.CategoryName, "Allows View Dashboard"),
+            new(AdminDashboardRead, "View Dashboard", CategoryAdminDashboard.Category, CategoryAdminDashboard.CategoryName, "Allows View Dashboard"),
 
             //**Usermanagement
-            new(AdminUserManagementCreate, "Create User", CategoryAdminUserManagement.Category,CategoryAdminUserManagement.CategoryName, "Allows creating new users"),
-            new(AdminUserManagementRead, "View Users", CategoryAdminUserManagement.Category,CategoryAdminUserManagement.CategoryName, "Allows viewing user information"),
-            new(AdminUserManagementEdit, "Update User", CategoryAdminUserManagement.Category,CategoryAdminUserManagement.CategoryName, "Allows updating user information"),
-            new(AdminUserManagementDelete, "Delete User", CategoryAdminUserManagement.Category,CategoryAdminUserManagement.CategoryName, "Allows deleting users"),
+            new(AdminUserManagementCreate, "Create User", CategoryAdminUserManagement.Category, CategoryAdminUserManagement.CategoryName, "Allows creating new users"),
+            new(AdminUserManagementRead, "View Users", CategoryAdminUserManagement.Category, CategoryAdminUserManagement.CategoryName, "Allows viewing user information"),
+            new(AdminUserManagementEdit, "Update User", CategoryAdminUserManagement.Category, CategoryAdminUserManagement.CategoryName, "Allows updating user information"),
+            new(AdminUserManagementDelete, "Delete User", CategoryAdminUserManagement.Category, CategoryAdminUserManagement.CategoryName, "Allows deleting users"),
 
             //**Profile
-            new(AdminSettingsProfileRead, "Profile Read", CategoryAdminSettingsProfile.Category,CategoryAdminSettingsProfile.CategoryName, "Allows Read user Profiles"),
-            new(AdminSettingsProfileEdit, "Profile Edit", CategoryAdminSettingsProfile.Category,CategoryAdminSettingsProfile.CategoryName, "Allows Edit user Profiles"),
+            new(AdminSettingsProfileRead, "Profile Read", CategoryAdminSettingsProfile.Category, CategoryAdminSettingsProfile.CategoryName, "Allows Read user Profiles"),
+            new(AdminSettingsProfileEdit, "Profile Edit", CategoryAdminSettingsProfile.Category, CategoryAdminSettingsProfile.CategoryName, "Allows Edit user Profiles"),
 
             //** Password
-            new(AdminSettingsPasswordChange, "Change Password", CategoryAdminSettingsPassword.Category,CategoryAdminSettingsPassword.CategoryName, "Allows Change user Password"),
+            new(AdminSettingsPasswordChange, "Change Password", CategoryAdminSettingsPassword.Category, CategoryAdminSettingsPassword.CategoryName, "Allows Change user Password"),
 
             //**Role Managment
-            new(AdminSettingsRolePermissionCreate, "Create Role", CategoryAdminSettingsRolePermission.Category,CategoryAdminSettingsRolePermission.CategoryName, "Allows creating new roles"),
-            new(AdminSettingsRolePermissionRead, "View Roles", CategoryAdminSettingsRolePermission.Category,CategoryAdminSettingsRolePermission.CategoryName, "Allows viewing role information"),
-            new(AdminSettingsRolePermissionEdit, "Update Role", CategoryAdminSettingsRolePermission.Category,CategoryAdminSettingsRolePermission.CategoryName, "Allows updating role information"),
-            new(AdminSettingsRolePermissionDelete, "Delete Role", CategoryAdminSettingsRolePermission.Category,CategoryAdminSettingsRolePermission.CategoryName, "Allows deleting roles"),
+            new(AdminSettingsRolePermissionCreate, "Create Role", CategoryAdminSettingsRolePermission.Category, CategoryAdminSettingsRolePermission.CategoryName, "Allows creating new roles"),
+            new(AdminSettingsRolePermissionRead, "View Roles", CategoryAdminSettingsRolePermission.Category, CategoryAdminSettingsRolePermission.CategoryName, "Allows viewing role information"),
+            new(AdminSettingsRolePermissionEdit, "Update Role", CategoryAdminSettingsRolePermission.Category, CategoryAdminSettingsRolePermission.CategoryName, "Allows updating role information"),
+            new(AdminSettingsRolePermissionDelete, "Delete Role", CategoryAdminSettingsRolePermission.Category, CategoryAdminSettingsRolePermission.CategoryName, "Allows deleting roles"),
 
             //** PD
-            new(PDSetupAccess, "PD Setup Access", PD.Category,PD.CategoryName, "Access to PD setup functionalities"),
+            new(PDSetupAccess, "PD Setup Access", PD.Category, PD.CategoryName, "Access to PD setup functionalities"),
 
-            //EclAnalysis
+            //** ECL Analysis
             new(EclAnalysisAccess, "Access ECL Analysis", CategoryEclAnalysis.Category, CategoryEclAnalysis.CategoryName, "Allows access to ECL Analysis module"),
             new(EclAnalysisThresholdCalculation, "Calculate Threshold Summaries", CategoryEclAnalysis.Category, CategoryEclAnalysis.CategoryName, "Allows calculation of ECL threshold summaries"),
-            
-            //gemeral
-            new(UsersAccess, "User Access", CategoryUsers.Category,CategoryUsers.CategoryName, "General user access permissions")
+            new(EclAnalysisCashFlowManagement, "Manage Cash Flow Types", CategoryEclAnalysis.Category, CategoryEclAnalysis.CategoryName, "Allows creating and managing cash flow type configurations"),
+
+            //general
+            new(UsersAccess, "User Access", CategoryUsers.Category, CategoryUsers.CategoryName, "General user access permissions")
         };
     }
 

@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Calculations;
 using Application.Abstractions.Configuration;
 using Application.Abstractions.Data;
 using Application.Abstractions.Exporting;
@@ -12,6 +13,7 @@ using Infrastructure.Database;
 using Infrastructure.Database.Seeding;
 using Infrastructure.DomainEvents;
 using Infrastructure.Exporting;
+using Infrastructure.Services;
 using Infrastructure.Storage;
 using Infrastructure.Time;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -43,7 +45,7 @@ public static class DependencyInjection
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddTransient<IDomainEventsDispatcher, DomainEventsDispatcher>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
-        services.AddSingleton<Application.Abstractions.Caching.IEclThresholdSummaryCache, Infrastructure.Caching.EclThresholdSummaryCache>();
+
         var appConfiguration = new AppConfiguration(configuration);
         services.AddSingleton<IAppConfiguration>(appConfiguration);
 
@@ -67,6 +69,8 @@ public static class DependencyInjection
 
         services.AddScoped(typeof(IExportService<>), typeof(ExcelExportService<>));
 
+        // Register PD Calculation service as transient
+        services.AddTransient<IPDCalculationService, PDCalculationService>();
         // CSV Services
         services.AddScoped<ICsvParsingService, Services.CsvParsingService>();
 

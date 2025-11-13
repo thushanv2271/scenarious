@@ -2,11 +2,13 @@
 using Domain.Branches;
 using Domain.EfaConfigs;
 using Domain.Exports;
+using Domain.FacilityCashFlowTypes;
 using Domain.Files;
 using Domain.Industries;
 using Domain.MasterData;
 using Domain.Organizations;
 using Domain.PasswordResetTokens;
+using Domain.PDCalculation;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
@@ -43,6 +45,10 @@ public interface IApplicationDbContext
     DbSet<SegmentMaster> SegmentMasters { get; }
 
     DbSet<UploadedFile> UploadedFiles { get; }
+    // PD Calculation entities
+    DbSet<FileDetails> FileDetails { get; }
+    DbSet<LoanDetails> LoanDetails { get; }
+
 
     DbSet<EfaConfiguration> EfaConfigurations { get; }
 
@@ -53,6 +59,7 @@ public interface IApplicationDbContext
     DbSet<Segment> Segments { get; }
     DbSet<Industry> Industries { get; }
     DbSet<Scenario> Scenarios { get; }
+    DbSet<FacilityCashFlowType> FacilityCashFlowTypes { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

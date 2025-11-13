@@ -196,6 +196,80 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("export_audits", "public");
                 });
 
+            modelBuilder.Entity("Domain.FacilityCashFlowTypes.FacilityCashFlowType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CashFlowType")
+                        .HasColumnType("integer")
+                        .HasColumnName("cash_flow_type");
+
+                    b.Property<string>("Configuration")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("configuration");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("FacilityNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("facility_number");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<Guid>("ScenarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scenario_id");
+
+                    b.Property<Guid>("SegmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("segment_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_facility_cash_flow_types");
+
+                    b.HasIndex("FacilityNumber")
+                        .HasDatabaseName("ix_facility_cash_flow_types_facility_number");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_facility_cash_flow_types_is_active")
+                        .HasFilter("is_active = true");
+
+                    b.HasIndex("ScenarioId")
+                        .HasDatabaseName("ix_facility_cash_flow_types_scenario_id");
+
+                    b.HasIndex("SegmentId")
+                        .HasDatabaseName("ix_facility_cash_flow_types_segment_id");
+
+                    b.HasIndex("FacilityNumber", "ScenarioId", "IsActive")
+                        .IsUnique()
+                        .HasDatabaseName("uq_facility_scenario_active")
+                        .HasFilter("is_active = true");
+
+                    b.ToTable("facility_cash_flow_types", "public");
+                });
+
             modelBuilder.Entity("Domain.Files.UploadedFile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -379,6 +453,219 @@ namespace Infrastructure.Database.Migrations
                         .HasDatabaseName("IX_Organizations_IsActive");
 
                     b.ToTable("organizations", "public");
+                });
+
+            modelBuilder.Entity("Domain.PDCalculation.FileDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("integer")
+                        .HasColumnName("frequency");
+
+                    b.Property<int>("Part")
+                        .HasColumnType("integer")
+                        .HasColumnName("part");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("period");
+
+                    b.Property<DateTime>("QuarterEndedDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("quarter_ended_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_file_details");
+
+                    b.ToTable("file_details", "public");
+                });
+
+            modelBuilder.Entity("Domain.PDCalculation.LoanDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Branch")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("branch");
+
+                    b.Property<string>("BucketLabel")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("bucket_label");
+
+                    b.Property<string>("BucketingInIndividualAssessment")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("bucketing_in_individual_assessment");
+
+                    b.Property<string>("CollateralType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("collateral_type");
+
+                    b.Property<decimal>("CollateralValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("collateral_value");
+
+                    b.Property<string>("CustomerNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("customer_number");
+
+                    b.Property<int>("DaysPastDue")
+                        .HasColumnType("integer")
+                        .HasColumnName("days_past_due");
+
+                    b.Property<string>("EarningType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("earning_type");
+
+                    b.Property<string>("FacilityNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("facility_number");
+
+                    b.Property<Guid>("FileDetailsId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_details_id");
+
+                    b.Property<string>("FinalBucket")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("final_bucket");
+
+                    b.Property<DateTime>("GrantDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("grant_date");
+
+                    b.Property<bool>("IndividuallyImpaired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("individually_impaired");
+
+                    b.Property<string>("Industry")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("industry");
+
+                    b.Property<string>("InstallmentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("installment_type");
+
+                    b.Property<decimal>("InterestInSuspense")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("interest_in_suspense");
+
+                    b.Property<decimal>("InterestRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("interest_rate");
+
+                    b.Property<decimal>("Limit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("limit");
+
+                    b.Property<DateTime>("MaturityDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("maturity_date");
+
+                    b.Property<string>("Nature")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("nature");
+
+                    b.Property<int>("NoOfTimesRestructured")
+                        .HasColumnType("integer")
+                        .HasColumnName("no_of_times_restructured");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("period");
+
+                    b.Property<string>("ProductCategory")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("product_category");
+
+                    b.Property<int>("RemainingMaturityYears")
+                        .HasColumnType("integer")
+                        .HasColumnName("remaining_maturity_years");
+
+                    b.Property<bool>("Rescheduled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rescheduled");
+
+                    b.Property<bool>("Restructured")
+                        .HasColumnType("boolean")
+                        .HasColumnName("restructured");
+
+                    b.Property<string>("Segment")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("segment");
+
+                    b.Property<decimal>("TotalOS")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_os");
+
+                    b.Property<decimal>("UndisbursedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("undisbursed_amount");
+
+                    b.Property<bool>("UpgradedToDelinquencyBucket")
+                        .HasColumnType("boolean")
+                        .HasColumnName("upgraded_to_delinquency_bucket");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loan_details");
+
+                    b.HasIndex("FileDetailsId")
+                        .HasDatabaseName("ix_loan_details_file_details_id");
+
+                    b.ToTable("loan_details", "public");
                 });
 
             modelBuilder.Entity("Domain.PDTempData.PDTempData", b =>
@@ -897,6 +1184,35 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_branches_organizations_organization_id");
                 });
 
+            modelBuilder.Entity("Domain.FacilityCashFlowTypes.FacilityCashFlowType", b =>
+                {
+                    b.HasOne("Domain.Scenarios.Scenario", null)
+                        .WithMany()
+                        .HasForeignKey("ScenarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_facility_cash_flow_types_scenarios");
+
+                    b.HasOne("Domain.Segments.Segment", null)
+                        .WithMany()
+                        .HasForeignKey("SegmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_facility_cash_flow_types_segments");
+                });
+
+            modelBuilder.Entity("Domain.PDCalculation.LoanDetails", b =>
+                {
+                    b.HasOne("Domain.PDCalculation.FileDetails", "FileDetails")
+                        .WithMany("LoanDetails")
+                        .HasForeignKey("FileDetailsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_loan_details_file_details_file_details_id");
+
+                    b.Navigation("FileDetails");
+                });
+
             modelBuilder.Entity("Domain.RolePermissions.RolePermission", b =>
                 {
                     b.HasOne("Domain.Permissions.Permission", "Permission")
@@ -920,28 +1236,34 @@ namespace Infrastructure.Database.Migrations
 
             modelBuilder.Entity("Domain.Scenarios.Scenario", b =>
                 {
-                    b.HasOne("Domain.Segments.Segment", null)
-                        .WithMany()
+                    b.HasOne("Domain.Segments.Segment", "Segment")
+                        .WithMany("Scenarios")
                         .HasForeignKey("SegmentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_scenarios_segments_segment_id");
 
-                    b.HasOne("Domain.Files.UploadedFile", null)
+                    b.HasOne("Domain.Files.UploadedFile", "UploadedFile")
                         .WithMany()
                         .HasForeignKey("UploadedFileId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_scenarios_uploaded_files_uploaded_file_id");
+
+                    b.Navigation("Segment");
+
+                    b.Navigation("UploadedFile");
                 });
 
             modelBuilder.Entity("Domain.Segments.Segment", b =>
                 {
-                    b.HasOne("Domain.ProductCategories.ProductCategory", null)
-                        .WithMany()
+                    b.HasOne("Domain.ProductCategories.ProductCategory", "ProductCategory")
+                        .WithMany("Segments")
                         .HasForeignKey("ProductCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_segments_product_categories_product_category_id");
+
+                    b.Navigation("ProductCategory");
                 });
 
             modelBuilder.Entity("Domain.Todos.TodoItem", b =>
@@ -984,6 +1306,21 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_users_branches_branch_id");
 
                     b.Navigation("Branch");
+                });
+
+            modelBuilder.Entity("Domain.PDCalculation.FileDetails", b =>
+                {
+                    b.Navigation("LoanDetails");
+                });
+
+            modelBuilder.Entity("Domain.ProductCategories.ProductCategory", b =>
+                {
+                    b.Navigation("Segments");
+                });
+
+            modelBuilder.Entity("Domain.Segments.Segment", b =>
+                {
+                    b.Navigation("Scenarios");
                 });
 #pragma warning restore 612, 618
         }

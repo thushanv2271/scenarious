@@ -28,6 +28,12 @@ internal sealed class ProductCategoryConfiguration : IEntityTypeConfiguration<Pr
             .IsUnique()
             .HasDatabaseName("ix_product_categories_type_name");
 
+        // Configure one-to-many relationship with Segments
+        builder.HasMany(pc => pc.Segments)
+            .WithOne(s => s.ProductCategory)
+            .HasForeignKey(s => s.ProductCategoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.ToTable("product_categories");
     }
 }

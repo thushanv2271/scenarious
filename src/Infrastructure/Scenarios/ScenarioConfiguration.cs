@@ -44,13 +44,14 @@ internal sealed class ScenarioConfiguration : IEntityTypeConfiguration<Scenario>
         builder.Property(s => s.UpdatedAt)
             .IsRequired();
 
-        builder.HasOne<Segment>()
-            .WithMany()
+        // Configure relationships
+        builder.HasOne(s => s.Segment)
+            .WithMany(seg => seg.Scenarios)
             .HasForeignKey(s => s.SegmentId)
             .OnDelete(DeleteBehavior.Cascade)
             .HasConstraintName("fk_scenarios_segments_segment_id");
 
-        builder.HasOne<UploadedFile>()
+        builder.HasOne(s => s.UploadedFile)
             .WithMany()
             .HasForeignKey(s => s.UploadedFileId)
             .OnDelete(DeleteBehavior.SetNull)
@@ -65,6 +66,7 @@ internal sealed class ScenarioConfiguration : IEntityTypeConfiguration<Scenario>
 
         builder.HasIndex(s => s.UploadedFileId)
             .HasDatabaseName("ix_scenarios_uploaded_file_id");
+
 
         builder.ToTable("scenarios");
     }

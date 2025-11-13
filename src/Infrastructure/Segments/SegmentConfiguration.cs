@@ -24,11 +24,17 @@ internal sealed class SegmentConfiguration : IEntityTypeConfiguration<Segment>
         builder.Property(s => s.UpdatedAt)
             .IsRequired();
 
-        builder.HasOne<ProductCategory>()
-            .WithMany()
+        // Configure relationships
+        builder.HasOne(s => s.ProductCategory)
+            .WithMany(pc => pc.Segments)
             .HasForeignKey(s => s.ProductCategoryId)
             .OnDelete(DeleteBehavior.Cascade)
             .HasConstraintName("fk_segments_product_categories_product_category_id");
+
+        builder.HasMany(s => s.Scenarios)
+            .WithOne(sc => sc.Segment)
+            .HasForeignKey(sc => sc.SegmentId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(s => s.ProductCategoryId)
             .HasDatabaseName("ix_segments_product_category_id");

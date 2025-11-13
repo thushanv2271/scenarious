@@ -1,5 +1,6 @@
 ﻿using Application.Abstractions.Behaviors;
 using Application.Abstractions.Messaging;
+using Application.Services;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using SharedKernel;
@@ -35,6 +36,8 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
 
+        // Register PDSetupConfigurationService
+        services.AddScoped<IPDSetupConfigurationService, PDSetupConfigurationService>();
         // Register specific handlers
         services.AddScoped<ProductCategories.UploadProductCategoriesAndSegmentsHandler>();
 

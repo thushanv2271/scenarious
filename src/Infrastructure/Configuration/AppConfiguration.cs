@@ -15,6 +15,5 @@ public class AppConfiguration : IAppConfiguration
 	public string FrontEndUrl => _configuration["FrontEndUrl"]!;
 	public string UserExportPath => _configuration["UserExportPath"]!;
 	public string HostingType => _configuration["HostingType"]!;
-
-
+	public string PDFilesPath => _configuration["PDFilesPath"]!;
 }

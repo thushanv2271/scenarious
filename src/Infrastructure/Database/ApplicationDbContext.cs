@@ -3,11 +3,13 @@ using Domain.Authentication;
 using Domain.Branches;
 using Domain.EfaConfigs;
 using Domain.Exports;
+using Domain.FacilityCashFlowTypes;
 using Domain.Files;
 using Domain.Industries;
 using Domain.MasterData;
 using Domain.Organizations;
 using Domain.PasswordResetTokens;
+using Domain.PDCalculation;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
@@ -49,6 +51,10 @@ public sealed class ApplicationDbContext(
     public DbSet<SegmentMaster> SegmentMasters { get; set; } = null!;
 
     public DbSet<UploadedFile> UploadedFiles { get; set; } = null!;
+    // PD Calculation entities
+    public DbSet<FileDetails> FileDetails { get; set; } = null!;
+    public DbSet<LoanDetails> LoanDetails { get; set; } = null!;
+
 
     public DbSet<EfaConfiguration> EfaConfigurations { get; set; }
     public DbSet<Organization> Organizations { get; set; }
@@ -58,7 +64,7 @@ public sealed class ApplicationDbContext(
     public DbSet<Segment> Segments { get; set; }
     public DbSet<Industry> Industries { get; set; }
     public DbSet<Scenario> Scenarios { get; set; }
-
+    public DbSet<FacilityCashFlowType> FacilityCashFlowTypes { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);

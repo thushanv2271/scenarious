@@ -25,8 +25,10 @@ internal sealed class UploadSegmentMasterDataCommandHandler(
     private static readonly HashSet<string> AllowedExtensions = [".xlsx"];
     private const string ExpectedFileName = "SegmentMasterData.xlsx";
 
+
+
     public async Task<Result<UploadSegmentMasterDataResponse>> Handle(
-        UploadSegmentMasterDataCommand command, 
+        UploadSegmentMasterDataCommand command,
         CancellationToken cancellationToken)
     {
         if (command is null)
@@ -65,7 +67,7 @@ internal sealed class UploadSegmentMasterDataCommandHandler(
         }
 
         string expandedPath = Environment.ExpandEnvironmentVariables(configuredPath);
-        
+
         string directoryPath = Path.GetDirectoryName(expandedPath);
         if (!string.IsNullOrWhiteSpace(directoryPath) && !Directory.Exists(directoryPath))
         {
@@ -110,9 +112,8 @@ internal sealed class UploadSegmentMasterDataCommandHandler(
         logger.LogInformation("Existing SegmentMaster data cleared.");
 
         logger.LogInformation("Loading new SegmentMaster data from Excel file...");
-        
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-        using ExcelPackage package = new(excelPath);
+
+        using ExcelPackage package = new(new FileInfo(excelPath));
         ExcelWorksheet worksheet = package.Workbook.Worksheets[0];
 
         Dictionary<string, List<string>> segmentDict = new();
@@ -152,7 +153,7 @@ internal sealed class UploadSegmentMasterDataCommandHandler(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Successfully loaded {Count} SegmentMaster records from uploaded file.", entities.Count);
-        
+
         return entities.Count;
     }
 }

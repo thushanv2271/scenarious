@@ -7,4 +7,6 @@ public interface IAppConfiguration
 	string UserExportPath { get; }
 
 	string HostingType { get; }
+
+	string PDFilesPath { get; }
 }
