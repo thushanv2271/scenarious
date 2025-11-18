@@ -12,6 +12,8 @@ public class CategoryInfo
 
 public static class PermissionRegistry
 {
+
+
     #region Category Constants
     public static readonly CategoryInfo CategoryAdminDashboard = new CategoryInfo //Dashboard
     {
@@ -55,6 +57,10 @@ public static class PermissionRegistry
         Category = "Users",
         CategoryName = "Users"
     };
+
+
+
+
     #endregion
 
     #region Admin Permissions
@@ -96,28 +102,29 @@ public static class PermissionRegistry
     {
         return new List<PermissionDefinition>
         {
+
             // Admin Permissions
             // **Dashboard
-            new(AdminDashboardRead, "View Dashboard", CategoryAdminDashboard.Category, CategoryAdminDashboard.CategoryName, "Allows View Dashboard"),
+            new(AdminDashboardRead, "View Dashboard", CategoryAdminDashboard.Category,CategoryAdminDashboard.CategoryName, "Allows View Dashboard"),
 
             //**Usermanagement
-            new(AdminUserManagementCreate, "Create User", CategoryAdminUserManagement.Category, CategoryAdminUserManagement.CategoryName, "Allows creating new users"),
-            new(AdminUserManagementRead, "View Users", CategoryAdminUserManagement.Category, CategoryAdminUserManagement.CategoryName, "Allows viewing user information"),
-            new(AdminUserManagementEdit, "Update User", CategoryAdminUserManagement.Category, CategoryAdminUserManagement.CategoryName, "Allows updating user information"),
-            new(AdminUserManagementDelete, "Delete User", CategoryAdminUserManagement.Category, CategoryAdminUserManagement.CategoryName, "Allows deleting users"),
+            new(AdminUserManagementCreate, "Create User", CategoryAdminUserManagement.Category,CategoryAdminUserManagement.CategoryName, "Allows creating new users"),
+            new(AdminUserManagementRead, "View Users", CategoryAdminUserManagement.Category,CategoryAdminUserManagement.CategoryName, "Allows viewing user information"),
+            new(AdminUserManagementEdit, "Update User", CategoryAdminUserManagement.Category,CategoryAdminUserManagement.CategoryName, "Allows updating user information"),
+            new(AdminUserManagementDelete, "Delete User", CategoryAdminUserManagement.Category,CategoryAdminUserManagement.CategoryName, "Allows deleting users"),
 
             //**Profile
-            new(AdminSettingsProfileRead, "Profile Read", CategoryAdminSettingsProfile.Category, CategoryAdminSettingsProfile.CategoryName, "Allows Read user Profiles"),
-            new(AdminSettingsProfileEdit, "Profile Edit", CategoryAdminSettingsProfile.Category, CategoryAdminSettingsProfile.CategoryName, "Allows Edit user Profiles"),
+            new(AdminSettingsProfileRead, "Profile Read", CategoryAdminSettingsProfile.Category,CategoryAdminSettingsProfile.CategoryName, "Allows Read user Profiles"),
+            new(AdminSettingsProfileEdit, "Profile Edit", CategoryAdminSettingsProfile.Category,CategoryAdminSettingsProfile.CategoryName, "Allows Edit user Profiles"),
 
             //** Password
-            new(AdminSettingsPasswordChange, "Change Password", CategoryAdminSettingsPassword.Category, CategoryAdminSettingsPassword.CategoryName, "Allows Change user Password"),
+            new(AdminSettingsPasswordChange, "Change Password", CategoryAdminSettingsPassword.Category,CategoryAdminSettingsPassword.CategoryName, "Allows Change user Password"),
 
             //**Role Managment
-            new(AdminSettingsRolePermissionCreate, "Create Role", CategoryAdminSettingsRolePermission.Category, CategoryAdminSettingsRolePermission.CategoryName, "Allows creating new roles"),
-            new(AdminSettingsRolePermissionRead, "View Roles", CategoryAdminSettingsRolePermission.Category, CategoryAdminSettingsRolePermission.CategoryName, "Allows viewing role information"),
-            new(AdminSettingsRolePermissionEdit, "Update Role", CategoryAdminSettingsRolePermission.Category, CategoryAdminSettingsRolePermission.CategoryName, "Allows updating role information"),
-            new(AdminSettingsRolePermissionDelete, "Delete Role", CategoryAdminSettingsRolePermission.Category, CategoryAdminSettingsRolePermission.CategoryName, "Allows deleting roles"),
+            new(AdminSettingsRolePermissionCreate, "Create Role", CategoryAdminSettingsRolePermission.Category,CategoryAdminSettingsRolePermission.CategoryName, "Allows creating new roles"),
+            new(AdminSettingsRolePermissionRead, "View Roles", CategoryAdminSettingsRolePermission.Category,CategoryAdminSettingsRolePermission.CategoryName, "Allows viewing role information"),
+            new(AdminSettingsRolePermissionEdit, "Update Role", CategoryAdminSettingsRolePermission.Category,CategoryAdminSettingsRolePermission.CategoryName, "Allows updating role information"),
+            new(AdminSettingsRolePermissionDelete, "Delete Role", CategoryAdminSettingsRolePermission.Category,CategoryAdminSettingsRolePermission.CategoryName, "Allows deleting roles"),
 
             //** PD
             new(PDSetupAccess, "PD Setup Access", PD.Category, PD.CategoryName, "Access to PD setup functionalities"),

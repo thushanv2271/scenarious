@@ -8,7 +8,6 @@ using Domain.Industries;
 using Domain.MasterData;
 using Domain.Organizations;
 using Domain.PasswordResetTokens;
-using Domain.PDCalculation;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
@@ -21,6 +20,7 @@ using Domain.UserRoles;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
+using Domain.PDCalculation;
 
 namespace Application.Abstractions.Data;
 

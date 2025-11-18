@@ -224,10 +224,10 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                     segment,
                     branch,
                     SUM(total_os) as total_os,
-                    MAX(eir) as eir,
+                    MAX(interest_rate) as interest_rate,
                     MIN(grant_date) as grant_date,
                     MAX(maturity_date) as maturity_date,
-                    MAX(days_in_arrears) as days_in_arrears
+                    MAX(days_past_due) as days_past_due
                 FROM loan_details
                 WHERE facility_number = @facilityNumber
                 GROUP BY customer_number, facility_number, product_category, segment, branch
@@ -252,8 +252,8 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                 ProductCategory = reader.GetString(2),
                 Segment = reader.GetString(3),
                 Branch = reader.GetString(4),
-                //TotalOs = reader.GetDecimal(5),
-                //Eir = reader.GetDecimal(6),
+                TotalOs = reader.GetDecimal(5),
+                InterestRate = reader.GetDecimal(6),
                 GrantDate = reader.GetDateTime(7),
                 MaturityDate = reader.GetDateTime(8),
                 DaysInArrears = reader.GetInt32(9)
@@ -444,8 +444,8 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
         public string ProductCategory { get; init; } = string.Empty;
         public string Segment { get; init; } = string.Empty;
         public string Branch { get; init; } = string.Empty;
-        //public decimal TotalOs { get; init; }
-        //public decimal Eir { get; init; }
+        public decimal TotalOs { get; init; }
+        public decimal InterestRate { get; init; }
         public DateTime GrantDate { get; init; }
         public DateTime MaturityDate { get; init; }
         public int DaysInArrears { get; init; }
