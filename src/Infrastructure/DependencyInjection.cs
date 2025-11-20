@@ -4,6 +4,7 @@ using Application.Abstractions.Calculations;
 using Application.Abstractions.Configuration;
 using Application.Abstractions.Data;
 using Application.Abstractions.Exporting;
+using Application.Abstractions.Parsing;
 using Application.Abstractions.Storage;
 using Application.ProductCategories;
 using Infrastructure.Authentication;
@@ -73,6 +74,9 @@ public static class DependencyInjection
         services.AddTransient<IPDCalculationService, PDCalculationService>();
         // CSV Services
         services.AddScoped<ICsvParsingService, Services.CsvParsingService>();
+
+        // Register Excel Cash Flow Parser
+        services.AddScoped<IExcelCashFlowParser, ExcelCashFlowParser>();
 
         return services;
     }

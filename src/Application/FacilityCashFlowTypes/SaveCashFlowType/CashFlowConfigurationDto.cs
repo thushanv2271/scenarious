@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace Application.FacilityCashFlowTypes.SaveCashFlowType;
 
-namespace Application.FacilityCashFlowTypes.SaveCashFlowType;
 /// <summary>
 /// Configuration data transfer object for cash flow type settings
 /// </summary>
@@ -36,12 +31,12 @@ public sealed record CashFlowConfigurationDto
     public int? RealizationMonth { get; init; }
 
     /// <summary>
-    /// Description or notes
+    /// Haircut percentage for collateral value (0-1, e.g., 0.40 for 40%)
     /// </summary>
-    public string? Description { get; init; }
+    public decimal? HaircutPercentage { get; init; }
 
     /// <summary>
-    /// Reference to uploaded file (for last quarter cash flows)
+    /// Reference to uploaded file (for last quarter cash flows or payment schedules)
     /// </summary>
     public Guid? UploadedFileId { get; init; }
 
@@ -50,4 +45,3 @@ public sealed record CashFlowConfigurationDto
     /// </summary>
     public List<CustomCashFlowDto>? CustomCashFlows { get; init; }
 }
-

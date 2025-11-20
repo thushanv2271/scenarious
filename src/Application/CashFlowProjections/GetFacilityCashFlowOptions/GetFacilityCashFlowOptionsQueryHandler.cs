@@ -298,11 +298,4 @@ internal sealed class GetFacilityCashFlowOptionsQueryHandler(
         };
     }
 
-    private sealed class FacilityDetail
-    {
-        public string CustomerNumber { get; init; } = string.Empty;
-        public string FacilityNumber { get; init; } = string.Empty;
-        public string ProductCategory { get; init; } = string.Empty;
-        public string Segment { get; init; } = string.Empty;
-    }
 }

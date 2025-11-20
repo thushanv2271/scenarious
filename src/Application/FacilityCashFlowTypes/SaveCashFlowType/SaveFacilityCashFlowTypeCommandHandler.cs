@@ -12,9 +12,6 @@ using SharedKernel;
 
 namespace Application.FacilityCashFlowTypes.SaveCashFlowType;
 
-/// <summary>
-/// Handles saving facility cash flow type configurations
-/// </summary>
 internal sealed class SaveFacilityCashFlowTypeCommandHandler(
     IApplicationDbContext context,
     IUserContext userContext,
@@ -28,7 +25,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
     {
         try
         {
-            // Step 1: Validate segment exists
             Segment? segment = await context.Segments
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == command.SegmentId, cancellationToken);
@@ -40,7 +36,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                     FacilityCashFlowTypeErrors.SegmentNotFound(command.SegmentId));
             }
 
-            // Step 2: Validate scenario exists and is linked to the segment
             Scenario? scenario = await context.Scenarios
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == command.ScenarioId, cancellationToken);
@@ -55,15 +50,12 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
             if (scenario.SegmentId != command.SegmentId)
             {
                 logger.LogWarning(
-                    "Scenario {ScenarioId} is not linked to segment {SegmentId}. Scenario's segment: {ScenarioSegmentId}",
-                    command.ScenarioId,
-                    command.SegmentId,
-                    scenario.SegmentId);
+                    "Scenario {ScenarioId} is not linked to segment {SegmentId}",
+                    command.ScenarioId, command.SegmentId);
                 return Result.Failure<SaveFacilityCashFlowTypeResponse>(
                     FacilityCashFlowTypeErrors.ScenarioNotLinkedToSegment);
             }
 
-            // Step 3: Validate facility exists in loan_details
             Result<LoanDetail> facilityValidationResult = await ValidateFacilityAsync(
                 command.FacilityNumber,
                 segment,
@@ -79,7 +71,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                     facilityValidationResult.Error);
             }
 
-            // Step 4: Check for existing active cash flow type for this facility-scenario
             bool existingActiveType = await context.FacilityCashFlowTypes
                 .AnyAsync(f =>
                     f.FacilityNumber == command.FacilityNumber &&
@@ -91,13 +82,11 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
             {
                 logger.LogWarning(
                     "Active cash flow type already exists for facility {FacilityNumber} and scenario {ScenarioId}",
-                    command.FacilityNumber,
-                    command.ScenarioId);
+                    command.FacilityNumber, command.ScenarioId);
                 return Result.Failure<SaveFacilityCashFlowTypeResponse>(
                     FacilityCashFlowTypeErrors.DuplicateActiveCashFlowType);
             }
 
-            // Step 5: Validate configuration based on cash flow type
             Result configurationValidation = ValidateConfiguration(
                 command.CashFlowType,
                 command.Configuration);
@@ -112,14 +101,12 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                     configurationValidation.Error);
             }
 
-            // Step 6: Serialize configuration to JSON
-#pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
+#pragma warning disable CA1869
             string configurationJson = JsonSerializer.Serialize(
                 command.Configuration,
                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-#pragma warning restore CA1869 // Cache and reuse 'JsonSerializerOptions' instances
+#pragma warning restore CA1869
 
-            // Step 7: Create and save the entity
             var facilityCashFlowType = new FacilityCashFlowType
             {
                 Id = Guid.CreateVersion7(),
@@ -139,11 +126,8 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
 
             logger.LogInformation(
                 "Created cash flow type {CashFlowType} for facility {FacilityNumber}, scenario {ScenarioId}",
-                command.CashFlowType,
-                command.FacilityNumber,
-                command.ScenarioId);
+                command.CashFlowType, command.FacilityNumber, command.ScenarioId);
 
-            // Step 8: Fetch user details for response
             var user = await context.Users
                 .AsNoTracking()
                 .Where(u => u.Id == userContext.UserId)
@@ -154,7 +138,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                 ? $"{user.FirstName} {user.LastName}"
                 : "Unknown User";
 
-            // Step 9: Build response
             var response = new SaveFacilityCashFlowTypeResponse
             {
                 Id = facilityCashFlowType.Id,
@@ -187,11 +170,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
         }
     }
 
-    /// <summary>
-    /// Validates that the facility exists in loan_details and matches the segment
-    /// Note: A facility can have multiple records in loan_details, we just need to verify
-    /// that at least one record exists with matching segment
-    /// </summary>
     private async Task<Result<LoanDetail>> ValidateFacilityAsync(
         string facilityNumber,
         Segment segment,
@@ -214,8 +192,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
             await using var connection = new NpgsqlConnection(connectionString);
             await connection.OpenAsync(cancellationToken);
 
-            // Query to find ANY record matching the facility number and segment
-            // We group by facility to get aggregated data if multiple records exist
             string sql = @"
                 SELECT 
                     customer_number,
@@ -259,23 +235,18 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                 DaysInArrears = reader.GetInt32(9)
             };
 
-            // Validate segment name matches (case-insensitive)
             if (!loanDetail.Segment.Equals(segment.Name, StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogWarning(
                     "Segment mismatch for facility {FacilityNumber}. Expected: {ExpectedSegment}, Found: {ActualSegment}",
-                    facilityNumber,
-                    segment.Name,
-                    loanDetail.Segment);
+                    facilityNumber, segment.Name, loanDetail.Segment);
                 return Result.Failure<LoanDetail>(
                     FacilityCashFlowTypeErrors.FacilitySegmentMismatch);
             }
 
             logger.LogInformation(
                 "Facility validated: {FacilityNumber}, Customer: {CustomerNumber}, Segment: {Segment}",
-                loanDetail.FacilityNumber,
-                loanDetail.CustomerNumber,
-                loanDetail.Segment);
+                loanDetail.FacilityNumber, loanDetail.CustomerNumber, loanDetail.Segment);
 
             return Result.Success(loanDetail);
         }
@@ -289,9 +260,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
         }
     }
 
-    /// <summary>
-    /// Validates configuration based on cash flow type requirements
-    /// </summary>
     private static Result ValidateConfiguration(
         CashFlowsType cashFlowType,
         CashFlowConfigurationDto configuration)
@@ -299,7 +267,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
         return cashFlowType switch
         {
             CashFlowsType.ContractualCashFlows =>
-                // No special validation needed - uses original terms
                 Result.Success(),
 
             CashFlowsType.ContractModification =>
@@ -323,33 +290,47 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
     private static Result ValidateContractModificationConfiguration(
         CashFlowConfigurationDto configuration)
     {
-        if (string.IsNullOrWhiteSpace(configuration.Frequency))
+        // Allow either parameter-based OR file-based configuration
+        bool hasParameters = !string.IsNullOrWhiteSpace(configuration.Frequency) &&
+                            configuration.Value.HasValue &&
+                            configuration.TenureMonths.HasValue;
+
+        bool hasFile = configuration.UploadedFileId.HasValue;
+
+        if (!hasParameters && !hasFile)
         {
             return Result.Failure(
                 FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Frequency is required for contract modification"));
+                    "Contract modification requires either payment parameters (frequency, value, tenure) or an uploaded payment schedule file"));
         }
 
-        if (!configuration.Value.HasValue || configuration.Value.Value <= 0)
+        if (hasParameters)
         {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Value must be greater than zero for contract modification"));
-        }
+#pragma warning disable CS8629 // Nullable value type may be null.
+            if (configuration.Value.Value <= 0)
+            {
+                return Result.Failure(
+                    FacilityCashFlowTypeErrors.InvalidConfiguration(
+                        "Value must be greater than zero"));
+            }
+#pragma warning restore CS8629 // Nullable value type may be null.
 
-        if (!configuration.TenureMonths.HasValue || configuration.TenureMonths.Value <= 0)
-        {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Tenure months must be greater than zero for contract modification"));
-        }
+#pragma warning disable CS8629 // Nullable value type may be null.
+            if (configuration.TenureMonths.Value <= 0)
+            {
+                return Result.Failure(
+                    FacilityCashFlowTypeErrors.InvalidConfiguration(
+                        "Tenure months must be greater than zero"));
+            }
+#pragma warning restore CS8629 // Nullable value type may be null.
 
-        string[] validFrequencies = new[] { "Monthly", "Quarterly", "Annually" };
-        if (!validFrequencies.Contains(configuration.Frequency, StringComparer.OrdinalIgnoreCase))
-        {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Frequency must be Monthly, Quarterly, or Annually"));
+            string[] validFrequencies = new[] { "Monthly", "Quarterly", "Annually" };
+            if (!validFrequencies.Contains(configuration.Frequency, StringComparer.OrdinalIgnoreCase))
+            {
+                return Result.Failure(
+                    FacilityCashFlowTypeErrors.InvalidConfiguration(
+                        "Frequency must be Monthly, Quarterly, or Annually"));
+            }
         }
 
         return Result.Success();
@@ -370,6 +351,20 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
             return Result.Failure(
                 FacilityCashFlowTypeErrors.InvalidConfiguration(
                     "Realization month must be greater than zero"));
+        }
+
+        if (!configuration.HaircutPercentage.HasValue)
+        {
+            return Result.Failure(
+                FacilityCashFlowTypeErrors.InvalidConfiguration(
+                    "Haircut percentage is required"));
+        }
+
+        if (configuration.HaircutPercentage.Value < 0 || configuration.HaircutPercentage.Value > 1)
+        {
+            return Result.Failure(
+                FacilityCashFlowTypeErrors.InvalidConfiguration(
+                    "Haircut percentage must be between 0 and 1 (e.g., 0.40 for 40%)"));
         }
 
         return Result.Success();
@@ -418,9 +413,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
         return Result.Success();
     }
 
-    /// <summary>
-    /// Gets human-readable name for cash flow type
-    /// </summary>
     private static string GetCashFlowTypeName(CashFlowsType cashFlowType)
     {
         return cashFlowType switch
@@ -434,9 +426,6 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
         };
     }
 
-    /// <summary>
-    /// DTO representing loan details from the loan_details table
-    /// </summary>
     private sealed class LoanDetail
     {
         public string CustomerNumber { get; init; } = string.Empty;

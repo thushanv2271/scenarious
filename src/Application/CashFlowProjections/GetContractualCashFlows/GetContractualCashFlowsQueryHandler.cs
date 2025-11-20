@@ -1,5 +1,10 @@
-﻿using Application.Abstractions.Data;
+﻿using System.Text.Json;
+using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Parsing;
+using Application.FacilityCashFlowTypes.SaveCashFlowType;
+using Domain.FacilityCashFlowTypes;
+using Domain.Files;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -7,14 +12,17 @@ using SharedKernel;
 
 namespace Application.CashFlowProjections.GetContractualCashFlows;
 
-/// <summary>
-/// Handler to retrieve and calculate contractual cash flows from portfolio snapshot
-/// </summary>
 internal sealed class GetContractualCashFlowsQueryHandler(
     IApplicationDbContext context,
+    IExcelCashFlowParser excelParser,
     ILogger<GetContractualCashFlowsQueryHandler> logger)
     : IQueryHandler<GetContractualCashFlowsQuery, ContractualCashFlowsResponse>
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public async Task<Result<ContractualCashFlowsResponse>> Handle(
         GetContractualCashFlowsQuery query,
         CancellationToken cancellationToken)
@@ -34,7 +42,6 @@ internal sealed class GetContractualCashFlowsQueryHandler(
             await using var connection = new NpgsqlConnection(connectionString);
             await connection.OpenAsync(cancellationToken);
 
-            // Get facility details from latest portfolio snapshot
             string sql = @"
                 SELECT 
                     customer_number,
@@ -70,18 +77,41 @@ internal sealed class GetContractualCashFlowsQueryHandler(
             DateTime maturityDate = reader.GetDateTime(5);
             string installmentType = reader.GetString(6);
 
-            // Calculate tenure in months
-            int tenureMonths = (maturityDate.Year - DateTime.UtcNow.Year) * 12 +
-                               maturityDate.Month - DateTime.UtcNow.Month;
+            int tenureMonths = CalculateTenureMonths(maturityDate);
 
-            if (tenureMonths <= 0)
+            FacilityCashFlowType? savedConfig = await context.FacilityCashFlowTypes
+                .AsNoTracking()
+                .Where(f => f.FacilityNumber == query.FacilityNumber &&
+                           (f.CashFlowType == Domain.FacilityCashFlowTypes.CashFlowsType.ContractualCashFlows ||
+                            f.CashFlowType == Domain.FacilityCashFlowTypes.CashFlowsType.ContractModification) &&
+                           f.IsActive)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            List<MonthlyCashFlow> cashFlows;
+
+            if (savedConfig != null)
             {
-                logger.LogWarning("Facility {FacilityNumber} has already matured", query.FacilityNumber);
-                tenureMonths = 1; // Minimum 1 month
+                Result<List<MonthlyCashFlow>>? uploadedCashFlows = await TryGetUploadedCashFlowsAsync(
+                    savedConfig, query.FacilityNumber, cancellationToken);
+
+                if (uploadedCashFlows != null)
+                {
+                    return Result.Success(new ContractualCashFlowsResponse
+                    {
+                        FacilityNumber = facilityNumber,
+                        CustomerNumber = customerNumber,
+                        AmortisedCost = totalOutstanding,
+                        InterestRate = interestRate,
+                        GrantDate = grantDate,
+                        MaturityDate = maturityDate,
+                        TenureMonths = tenureMonths,
+                        InstallmentType = installmentType,
+                        ProjectedCashFlows = uploadedCashFlows.Value
+                    });
+                }
             }
 
-            // Generate cash flow projections based on installment type
-            List<MonthlyCashFlow> cashFlows = GenerateCashFlowProjections(
+            cashFlows = GenerateCashFlowProjections(
                 totalOutstanding,
                 interestRate,
                 tenureMonths,
@@ -118,6 +148,78 @@ internal sealed class GetContractualCashFlowsQueryHandler(
         }
     }
 
+    private int CalculateTenureMonths(DateTime maturityDate)
+    {
+        int tenureMonths = (maturityDate.Year - DateTime.UtcNow.Year) * 12 +
+                           maturityDate.Month - DateTime.UtcNow.Month;
+
+        if (tenureMonths <= 0)
+        {
+            logger.LogWarning("Facility has already matured, using minimum tenure");
+            return 1;
+        }
+
+        return tenureMonths;
+    }
+
+    private async Task<Result<List<MonthlyCashFlow>>?> TryGetUploadedCashFlowsAsync(
+        FacilityCashFlowType savedConfig,
+        string facilityNumber,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            CashFlowConfigurationDto? config = JsonSerializer.Deserialize<CashFlowConfigurationDto>(
+                savedConfig.Configuration,
+                JsonOptions);
+
+            if (config?.UploadedFileId == null)
+            {
+                return null;
+            }
+
+            UploadedFile? uploadedFile = await context.UploadedFiles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(f => f.Id == config.UploadedFileId.Value, cancellationToken);
+
+            if (uploadedFile == null)
+            {
+                return null;
+            }
+
+            Result<List<ParsedCashFlow>> parseResult = await excelParser.ParseCashFlowsAsync(
+                uploadedFile.PhysicalPath,
+                cancellationToken);
+
+            if (parseResult.IsFailure)
+            {
+                return null;
+            }
+
+            var cashFlows = parseResult.Value.Select(cf => new MonthlyCashFlow
+            {
+                Month = cf.Month,
+                PrincipalAmount = 0,
+                InterestAmount = 0,
+                TotalAmount = cf.CashFlow,
+                PaymentDate = DateTime.UtcNow.AddMonths(cf.Month)
+            }).ToList();
+
+            logger.LogInformation(
+                "Using uploaded payment schedule for facility {FacilityNumber}",
+                facilityNumber);
+
+            return Result.Success(cashFlows);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Failed to use uploaded payment schedule for facility {FacilityNumber}, falling back to calculation",
+                facilityNumber);
+            return null;
+        }
+    }
+
     private static List<MonthlyCashFlow> GenerateCashFlowProjections(
         decimal totalOutstanding,
         decimal annualInterestRate,
@@ -132,25 +234,13 @@ internal sealed class GetContractualCashFlowsQueryHandler(
         for (int month = 1; month <= tenureMonths; month++)
         {
             decimal interestAmount = remainingPrincipal * monthlyInterestRate;
-            decimal principalAmount;
-
-            // Calculate based on installment type
-            if (installmentType.Contains("Equal", StringComparison.OrdinalIgnoreCase))
-            {
-                // Equal Monthly Installment (EMI)
-                decimal emi = CalculateEMI(totalOutstanding, monthlyInterestRate, tenureMonths);
-                principalAmount = emi - interestAmount;
-            }
-            else if (installmentType.Contains("Bullet", StringComparison.OrdinalIgnoreCase))
-            {
-                // Bullet payment - principal only in last month
-                principalAmount = month == tenureMonths ? remainingPrincipal : 0;
-            }
-            else
-            {
-                // Default: Equal principal repayment
-                principalAmount = totalOutstanding / tenureMonths;
-            }
+            decimal principalAmount = CalculatePrincipalAmount(
+                totalOutstanding,
+                remainingPrincipal,
+                monthlyInterestRate,
+                tenureMonths,
+                installmentType,
+                month);
 
             decimal totalAmount = principalAmount + interestAmount;
             remainingPrincipal -= principalAmount;
@@ -166,6 +256,29 @@ internal sealed class GetContractualCashFlowsQueryHandler(
         }
 
         return cashFlows;
+    }
+
+    private static decimal CalculatePrincipalAmount(
+        decimal totalOutstanding,
+        decimal remainingPrincipal,
+        decimal monthlyInterestRate,
+        int tenureMonths,
+        string installmentType,
+        int currentMonth)
+    {
+        if (installmentType.Contains("Equal", StringComparison.OrdinalIgnoreCase))
+        {
+            decimal emi = CalculateEMI(totalOutstanding, monthlyInterestRate, tenureMonths);
+            decimal interestAmount = remainingPrincipal * monthlyInterestRate;
+            return emi - interestAmount;
+        }
+
+        if (installmentType.Contains("Bullet", StringComparison.OrdinalIgnoreCase))
+        {
+            return currentMonth == tenureMonths ? remainingPrincipal : 0;
+        }
+
+        return totalOutstanding / tenureMonths;
     }
 
     private static decimal CalculateEMI(decimal principal, decimal monthlyRate, int months)
