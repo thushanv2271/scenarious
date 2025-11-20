@@ -9,4 +9,5 @@ public static class Tags
     public const string ProductCategories = "Product Categories";
     public const string EclAnalysis = "ECL Analysis";
     public const string CashFlowTypes = "Cash Flow Types";
+    public const string CashFlowProjections = "Cash Flow Projections";
 }
