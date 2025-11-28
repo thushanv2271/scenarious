@@ -42,6 +42,9 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(o => o.FinancialYearEnd)
+            .IsRequired(false);
+
         builder.Property(o => o.CreatedAt)
             .IsRequired();
 

@@ -11,8 +11,10 @@ namespace Application.CashFlowProjections.GetFacilityCashFlowOptions;
 
 /// <summary>
 /// Handler to retrieve scenarios and cash flow options for a facility
+/// Fixed N+1 query issue by eager loading all related data
 /// </summary>
 internal sealed class GetFacilityCashFlowOptionsQueryHandler(
+    ILoanDetailsRepository loanRepository,
     IApplicationDbContext context,
     ILogger<GetFacilityCashFlowOptionsQueryHandler> logger)
     : IQueryHandler<GetFacilityCashFlowOptionsQuery, FacilityCashFlowOptionsResponse>
@@ -23,175 +25,119 @@ internal sealed class GetFacilityCashFlowOptionsQueryHandler(
     {
         try
         {
-            logger.LogInformation("Starting GetFacilityCashFlowOptions for facility: {FacilityNumber}", query.FacilityNumber);
+            logger.LogInformation("Starting GetFacilityCashFlowOptions for facility: {FacilityNumber}",
+                query.FacilityNumber);
 
-            // Step 1: Get facility details from loan_details
-            logger.LogInformation("Step 1: Fetching facility details from loan_details");
-            FacilityDetail? facilityDetails = await GetFacilityDetailsAsync(query.FacilityNumber, cancellationToken);
+            // Step 1: Get facility details from repository
+            FacilityBasicDetail? facilityDetails = await loanRepository
+                .GetFacilityBasicDetailsAsync(query.FacilityNumber, cancellationToken);
 
             if (facilityDetails == null)
             {
-                logger.LogWarning("Step 1 Failed: Facility not found in loan_details: {FacilityNumber}", query.FacilityNumber);
+                logger.LogWarning("Facility not found: {FacilityNumber}", query.FacilityNumber);
                 return Result.Failure<FacilityCashFlowOptionsResponse>(
                     Error.NotFound("Facility.NotFound",
                         $"Facility {query.FacilityNumber} not found in loan_details"));
             }
 
-            logger.LogInformation("Step 1 Success: Found facility - Customer: {CustomerNumber}, Segment: {Segment}",
-                facilityDetails.CustomerNumber, facilityDetails.Segment);
-
-            // Step 2: Find matching segment in master data
-            logger.LogInformation("Step 2: Finding segment in master data for: {Segment}", facilityDetails.Segment);
+            // Step 2: Find matching segment (with product category)
+            // Use database-side case-insensitive comparison (Postgres ILIKE) to avoid client-side functions
+            string segmentName = facilityDetails.Segment ?? string.Empty;
 
             Domain.Segments.Segment? segment = await context.Segments
                 .AsNoTracking()
-                .FirstOrDefaultAsync(s =>
-                    s.Name.Equals(facilityDetails.Segment, StringComparison.OrdinalIgnoreCase),
+                .Include(s => s.ProductCategory)  // Eager load to avoid N+1
+                .FirstOrDefaultAsync(s => EF.Functions.ILike(s.Name, segmentName),
                     cancellationToken);
 
             if (segment == null)
             {
-                logger.LogWarning("Step 2 Failed: Segment not found in master data: {Segment}", facilityDetails.Segment);
+                logger.LogWarning("Segment not found: {Segment}", facilityDetails.Segment);
                 return Result.Failure<FacilityCashFlowOptionsResponse>(
                     Error.NotFound("Segment.NotFound",
                         $"Segment '{facilityDetails.Segment}' not found in master data"));
             }
 
-            logger.LogInformation("Step 2 Success: Found segment - ID: {SegmentId}, Name: {SegmentName}",
-                segment.Id, segment.Name);
-
-            // Step 3: Get scenarios for this segment
-            logger.LogInformation("Step 3: Fetching scenarios for segment ID: {SegmentId}", segment.Id);
-
+            // Step 3: Get all scenarios with related data in ONE query (fixed N+1)
             List<Domain.Scenarios.Scenario> scenarios = await context.Scenarios
                 .AsNoTracking()
+                .Include(s => s.UploadedFile)  // Eager load uploaded file
                 .Where(s => s.SegmentId == segment.Id)
                 .OrderBy(s => s.ScenarioName)
                 .ToListAsync(cancellationToken);
 
             if (!scenarios.Any())
             {
-                logger.LogWarning("Step 3 Failed: No scenarios found for segment: {SegmentName}", segment.Name);
+                logger.LogWarning("No scenarios found for segment: {SegmentName}", segment.Name);
                 return Result.Failure<FacilityCashFlowOptionsResponse>(
                     Error.NotFound("Scenarios.NotFound",
                         $"No scenarios configured for segment '{segment.Name}'"));
             }
 
-            logger.LogInformation("Step 3 Success: Found {Count} scenarios", scenarios.Count);
-
-            // Step 4: Get saved cash flow configurations for this facility
-            logger.LogInformation("Step 4: Fetching saved cash flow configurations for facility: {FacilityNumber}",
-                query.FacilityNumber);
-
-            List<Domain.FacilityCashFlowTypes.FacilityCashFlowType> savedConfigurations;
-
-#pragma warning disable S2139 // Exceptions should be either logged or rethrown but not both
-            try
-            {
-                savedConfigurations = await context.FacilityCashFlowTypes
-                    .AsNoTracking()
-                    .Where(f => f.FacilityNumber == query.FacilityNumber && f.IsActive)
-                    .ToListAsync(cancellationToken);
-
-                logger.LogInformation("Step 4 Success: Found {Count} saved configurations", savedConfigurations.Count);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Step 4 Failed: Error querying facility_cash_flow_types table");
-                throw;
-            }
-#pragma warning restore S2139 // Exceptions should be either logged or rethrown but not both
-
-            // Step 5: Get user names for created by
-            logger.LogInformation("Step 5: Fetching user details");
-
-            var userIds = savedConfigurations.Select(c => c.CreatedBy).Distinct().ToList();
-
-            if (userIds.Any())
-            {
-                logger.LogInformation("Step 5: Fetching {Count} user records", userIds.Count);
-            }
-
-            var users = await context.Users
+            // Step 4: Get ALL saved configurations in ONE query (fixed N+1)
+            List<FacilityCashFlowType> savedConfigurations = await context.FacilityCashFlowTypes
                 .AsNoTracking()
-                .Where(u => userIds.Contains(u.Id))
-                .Select(u => new { u.Id, u.FirstName, u.LastName })
+                .Where(f => f.FacilityNumber == query.FacilityNumber && f.IsActive)
                 .ToListAsync(cancellationToken);
 
-            var userDictionary = users.ToDictionary(
-                u => u.Id,
-                u => $"{u.FirstName} {u.LastName}");
+            // Step 5: Get ALL users in ONE query (fixed N+1)
+            var userIds = savedConfigurations.Select(c => c.CreatedBy).Distinct().ToList();
+            Dictionary<Guid, string> userDictionary = await context.Users
+                .AsNoTracking()
+                .Where(u => userIds.Contains(u.Id))
+                .Select(u => new { u.Id, FullName = u.FirstName + " " + u.LastName })
+                .ToDictionaryAsync(u => u.Id, u => u.FullName, cancellationToken);
 
-            logger.LogInformation("Step 5 Success: Retrieved {Count} user names", users.Count);
-
-            // Step 6: Build response
-            logger.LogInformation("Step 6: Building response with {ScenarioCount} scenarios", scenarios.Count);
-
-            var scenarioResponses = new List<ScenarioOptionResponse>();
-
-            foreach (Domain.Scenarios.Scenario scenario in scenarios)
+            // Step 6: Build response (all data already loaded)
+            var scenarioResponses = scenarios.Select(scenario =>
             {
-#pragma warning disable S2139 // Exceptions should be either logged or rethrown but not both
-                try
+                FacilityCashFlowType? savedConfig = savedConfigurations
+                    .FirstOrDefault(c => c.ScenarioId == scenario.Id);
+
+                CashFlowTypeConfigurationResponse? configResponse = null;
+
+                if (savedConfig != null)
                 {
-                    FacilityCashFlowType? savedConfig = savedConfigurations.FirstOrDefault(c => c.ScenarioId == scenario.Id);
-
-                    CashFlowTypeConfigurationResponse? configResponse = null;
-
-                    if (savedConfig != null)
+                    try
                     {
-                        logger.LogDebug("Processing saved config for scenario {ScenarioName}, Type: {CashFlowType}",
-                            scenario.ScenarioName, savedConfig.CashFlowType);
+                        object? configObject = JsonSerializer.Deserialize<object>(savedConfig.Configuration);
 
-                        try
+                        configResponse = new CashFlowTypeConfigurationResponse
                         {
-                            object? configObject = JsonSerializer.Deserialize<object>(savedConfig.Configuration);
-
-                            configResponse = new CashFlowTypeConfigurationResponse
-                            {
-                                Id = savedConfig.Id,
-                                CashFlowType = savedConfig.CashFlowType,
-                                CashFlowTypeName = GetCashFlowTypeName(savedConfig.CashFlowType),
-                                Configuration = configObject ?? new(),
-                                CreatedAt = savedConfig.CreatedAt,
-                                CreatedByName = userDictionary.GetValueOrDefault(savedConfig.CreatedBy, "Unknown User")
-                            };
-                        }
-                        catch (JsonException jsonEx)
-                        {
-                            logger.LogError(jsonEx, "Error deserializing configuration JSON for config ID: {ConfigId}", savedConfig.Id);
-                            // Continue with null configuration
-                        }
+                            Id = savedConfig.Id,
+                            CashFlowType = savedConfig.CashFlowType,
+                            CashFlowTypeName = GetCashFlowTypeName(savedConfig.CashFlowType),
+                            Configuration = configObject ?? new(),
+                            CreatedAt = savedConfig.CreatedAt,
+                            CreatedByName = userDictionary.GetValueOrDefault(savedConfig.CreatedBy, "Unknown User")
+                        };
                     }
-
-                    scenarioResponses.Add(new ScenarioOptionResponse
+                    catch (JsonException jsonEx)
                     {
-                        ScenarioId = scenario.Id,
-                        ScenarioName = scenario.ScenarioName,
-                        Probability = scenario.Probability,
-                        ContractualCashFlowsEnabled = scenario.ContractualCashFlowsEnabled,
-                        LastQuarterCashFlowsEnabled = scenario.LastQuarterCashFlowsEnabled,
-                        OtherCashFlowsEnabled = scenario.OtherCashFlowsEnabled,
-                        CollateralValueEnabled = scenario.CollateralValueEnabled,
-                        SavedCashFlowConfiguration = configResponse
-                    });
+                        logger.LogError(jsonEx, "Error deserializing configuration for ID: {ConfigId}",
+                            savedConfig.Id);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Error processing scenario: {ScenarioName}", scenario.ScenarioName);
-                    throw;
-                }
-#pragma warning restore S2139 // Exceptions should be either logged or rethrown but not both
-            }
 
-            logger.LogInformation("Step 6 Success: Built {Count} scenario responses", scenarioResponses.Count);
+                return new ScenarioOptionResponse
+                {
+                    ScenarioId = scenario.Id,
+                    ScenarioName = scenario.ScenarioName,
+                    Probability = scenario.Probability,
+                    ContractualCashFlowsEnabled = scenario.ContractualCashFlowsEnabled,
+                    LastQuarterCashFlowsEnabled = scenario.LastQuarterCashFlowsEnabled,
+                    OtherCashFlowsEnabled = scenario.OtherCashFlowsEnabled,
+                    CollateralValueEnabled = scenario.CollateralValueEnabled,
+                    SavedCashFlowConfiguration = configResponse
+                };
+            }).ToList();
 
             var response = new FacilityCashFlowOptionsResponse
             {
                 FacilityNumber = facilityDetails.FacilityNumber,
                 CustomerNumber = facilityDetails.CustomerNumber,
                 ProductCategory = facilityDetails.ProductCategory,
-                Segment = facilityDetails.Segment,
+                Segment = facilityDetails.Segment ?? string.Empty,
                 SegmentId = segment.Id,
                 AvailableScenarios = scenarioResponses
             };
@@ -208,83 +154,22 @@ internal sealed class GetFacilityCashFlowOptionsQueryHandler(
                 "Database error retrieving cash flow options for facility {FacilityNumber}. Error Code: {ErrorCode}",
                 query.FacilityNumber, npgEx.ErrorCode);
             return Result.Failure<FacilityCashFlowOptionsResponse>(
-                Error.Failure("Database.Error",
-                    $"Database error: {npgEx.Message}"));
+                Error.Failure("Database.Error", $"Database error: {npgEx.Message}"));
         }
         catch (Exception ex)
         {
             logger.LogError(ex,
-                "Unexpected error retrieving cash flow options for facility {FacilityNumber}. Exception Type: {ExceptionType}",
-                query.FacilityNumber, ex.GetType().Name);
+                "Error retrieving cash flow options for facility {FacilityNumber}",
+                query.FacilityNumber);
             return Result.Failure<FacilityCashFlowOptionsResponse>(
                 Error.Failure("FacilityCashFlowOptions.RetrievalError",
                     $"Error retrieving cash flow options: {ex.Message}"));
         }
     }
 
-    private async Task<FacilityDetail?> GetFacilityDetailsAsync(
-        string facilityNumber,
-        CancellationToken cancellationToken)
-    {
-#pragma warning disable S2139 // Exceptions should be either logged or rethrown but not both
-        try
-        {
-            var dbContext = context as DbContext;
-            string? connectionString = dbContext?.Database.GetConnectionString();
-
-            if (string.IsNullOrEmpty(connectionString))
-            {
-                logger.LogError("Database connection string is null or empty");
-                return null;
-            }
-
-            logger.LogDebug("Opening database connection for facility lookup");
-
-            await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(cancellationToken);
-
-            string sql = @"
-                SELECT 
-                    customer_number,
-                    facility_number,
-                    product_category,
-                    segment
-                FROM loan_details
-                WHERE facility_number = @facilityNumber
-                LIMIT 1";
-
-            await using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@facilityNumber", facilityNumber);
-
-            logger.LogDebug("Executing SQL query for facility: {FacilityNumber}", facilityNumber);
-
-            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (await reader.ReadAsync(cancellationToken))
-            {
-                var detail = new FacilityDetail
-                {
-                    CustomerNumber = reader.GetString(0),
-                    FacilityNumber = reader.GetString(1),
-                    ProductCategory = reader.GetString(2),
-                    Segment = reader.GetString(3)
-                };
-
-                logger.LogDebug("Successfully read facility details from database");
-                return detail;
-            }
-
-            logger.LogDebug("No facility found with number: {FacilityNumber}", facilityNumber);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error in GetFacilityDetailsAsync for facility: {FacilityNumber}", facilityNumber);
-            throw;
-        }
-#pragma warning restore S2139 // Exceptions should be either logged or rethrown but not both
-    }
-
+    /// <summary>
+    /// Gets user-friendly name for cash flow type
+    /// </summary>
     private static string GetCashFlowTypeName(CashFlowsType cashFlowType)
     {
         return cashFlowType switch
@@ -297,5 +182,4 @@ internal sealed class GetFacilityCashFlowOptionsQueryHandler(
             _ => "Unknown"
         };
     }
-
 }

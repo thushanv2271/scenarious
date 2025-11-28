@@ -6,6 +6,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Exporting;
 using Application.Abstractions.Parsing;
 using Application.Abstractions.Storage;
+using Application.FacilityCashFlowTypes.SaveCashFlowType.Validators;
 using Application.ProductCategories;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
@@ -14,6 +15,7 @@ using Infrastructure.Database;
 using Infrastructure.Database.Seeding;
 using Infrastructure.DomainEvents;
 using Infrastructure.Exporting;
+using Infrastructure.Repositories;
 using Infrastructure.Services;
 using Infrastructure.Storage;
 using Infrastructure.Time;
@@ -46,7 +48,7 @@ public static class DependencyInjection
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddTransient<IDomainEventsDispatcher, DomainEventsDispatcher>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
-
+        services.AddSingleton<Application.Abstractions.Caching.IEclThresholdSummaryCache, Infrastructure.Caching.EclThresholdSummaryCache>();
         var appConfiguration = new AppConfiguration(configuration);
         services.AddSingleton<IAppConfiguration>(appConfiguration);
 
@@ -77,6 +79,11 @@ public static class DependencyInjection
 
         // Register Excel Cash Flow Parser
         services.AddScoped<IExcelCashFlowParser, ExcelCashFlowParser>();
+
+        // Add after existing service registrations
+        services.AddScoped<ILoanDetailsRepository, LoanDetailsRepository>();
+        services.AddScoped<ICashFlowCalculationService, CashFlowCalculationService>();
+        services.AddScoped<ICashFlowConfigurationValidator, CashFlowConfigurationValidator>();
 
         return services;
     }
@@ -128,6 +135,7 @@ public static class DependencyInjection
         services.AddScoped<IUserContext, UserContext>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenProvider, TokenProvider>();
+
 
         return services;
     }

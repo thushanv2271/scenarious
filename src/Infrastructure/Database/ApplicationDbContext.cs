@@ -1,10 +1,13 @@
-﻿using Application.Abstractions.Data;
+﻿using System.Collections.Generic;
+using Application.Abstractions.Data;
 using Domain.Authentication;
 using Domain.Branches;
+using Domain.Configurations;
 using Domain.EfaConfigs;
 using Domain.Exports;
 using Domain.FacilityCashFlowTypes;
 using Domain.Files;
+using Domain.CollectiveImpairment;
 using Domain.Industries;
 using Domain.MasterData;
 using Domain.Organizations;
@@ -12,6 +15,7 @@ using Domain.PasswordResetTokens;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
+using Domain.RiskEvaluations;
 using Domain.RolePermissions;
 using Domain.Roles;
 using Domain.Scenarios;
@@ -48,9 +52,12 @@ public sealed class ApplicationDbContext(
 
     public DbSet<PDTempData> PDTempDatas { get; set; } = null!;
 
+    public DbSet<CollectiveImpairmentConfig> CollectiveImpairmentConfigs { get; set; } = null!;
+
     public DbSet<SegmentMaster> SegmentMasters { get; set; } = null!;
 
     public DbSet<UploadedFile> UploadedFiles { get; set; } = null!;
+    public DbSet<FileValidationResult> FileValidationResults { get; set; } = null!;
     // PD Calculation entities
     public DbSet<FileDetails> FileDetails { get; set; } = null!;
     public DbSet<LoanDetails> LoanDetails { get; set; } = null!;
@@ -64,6 +71,14 @@ public sealed class ApplicationDbContext(
     public DbSet<Segment> Segments { get; set; }
     public DbSet<Industry> Industries { get; set; }
     public DbSet<Scenario> Scenarios { get; set; }
+
+    public DbSet<RiskIndicator> RiskIndicators => Set<RiskIndicator>();
+    public DbSet<CustomerRiskEvaluation> CustomerRiskEvaluations => Set<CustomerRiskEvaluation>();
+    public DbSet<CustomerRiskIndicatorEvaluation> CustomerRiskIndicatorEvaluations => Set<CustomerRiskIndicatorEvaluation>();
+
+    public DbSet<AgeBucketConfiguration> AgeBucketConfigurations { get; set; } = null!;
+
+
     public DbSet<FacilityCashFlowType> FacilityCashFlowTypes { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

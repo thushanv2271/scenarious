@@ -2,4 +2,4 @@
 
 namespace Application.Users.Login;
 
-public sealed record LoginUserCommand(string Email, string Password) : ICommand<(string AccessToken, string RefreshToken, bool IsTemporaryPassword, bool IsWizardComplete)>;
+public sealed record LoginUserCommand(string Email, string Password) : ICommand<(string AccessToken, string RefreshToken, bool IsTemporaryPassword, bool IsWizardComplete, DateOnly? FinancialYearEnd)>;

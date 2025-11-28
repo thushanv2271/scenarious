@@ -131,6 +131,75 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("branches", "public");
                 });
 
+            modelBuilder.Entity("Domain.CollectiveImpairment.CollectiveImpairmentConfig", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ConfigJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("config_json");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_date");
+
+                    b.Property<string>("Parameter")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("parameter");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_collective_impairment_configs");
+
+                    b.HasIndex("Parameter")
+                        .HasDatabaseName("ix_collective_impairment_configs_parameter");
+
+                    b.ToTable("collective_impairment_configs", "public");
+                });
+
+            modelBuilder.Entity("Domain.Configurations.AgeBucketConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ConfigurationData")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("ConfigurationData");
+
+                    b.Property<DateTime>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateTime?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_age_bucket_configurations");
+
+                    b.ToTable("age_bucket_configurations", "public");
+                });
+
             modelBuilder.Entity("Domain.EfaConfigs.EfaConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -194,6 +263,49 @@ namespace Infrastructure.Database.Migrations
                         .HasName("pk_export_audits");
 
                     b.ToTable("export_audits", "public");
+                });
+
+            modelBuilder.Entity("Domain.Files.FileValidationResult", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Filename")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("filename");
+
+                    b.Property<DateTime?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TotalErrors")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_errors");
+
+                    b.Property<int>("TotalRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_rows");
+
+                    b.HasKey("Id")
+                        .HasName("pk_file_validation_results");
+
+                    b.ToTable("file_validation_results", "public");
                 });
 
             modelBuilder.Entity("Domain.FacilityCashFlowTypes.FacilityCashFlowType", b =>
@@ -421,6 +533,10 @@ namespace Infrastructure.Database.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("email");
+
+                    b.Property<DateOnly?>("FinancialYearEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("financial_year_end");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -822,6 +938,143 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("product_categories", "public");
                 });
 
+            modelBuilder.Entity("Domain.RiskEvaluations.CustomerRiskEvaluation", b =>
+                {
+                    b.Property<Guid>("EvaluationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evaluation_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CustomerNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("customer_number");
+
+                    b.Property<Guid>("EvaluatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evaluated_by");
+
+                    b.Property<DateTime>("EvaluationDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("evaluation_date");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("EvaluationId")
+                        .HasName("pk_customer_risk_evaluations");
+
+                    b.HasIndex("CustomerNumber")
+                        .HasDatabaseName("ix_customer_risk_evaluations_customer_number");
+
+                    b.HasIndex("CustomerNumber", "EvaluationDate")
+                        .HasDatabaseName("ix_customer_risk_evaluations_customer_date");
+
+                    b.ToTable("customer_risk_evaluations", "public");
+                });
+
+            modelBuilder.Entity("Domain.RiskEvaluations.CustomerRiskIndicatorEvaluation", b =>
+                {
+                    b.Property<Guid>("EvalDetailId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("eval_detail_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EvaluationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evaluation_id");
+
+                    b.Property<Guid>("IndicatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indicator_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("value");
+
+                    b.HasKey("EvalDetailId")
+                        .HasName("pk_customer_risk_indicator_evaluations");
+
+                    b.HasIndex("EvaluationId")
+                        .HasDatabaseName("ix_customer_risk_indicator_evaluations_evaluation_id");
+
+                    b.HasIndex("IndicatorId")
+                        .HasDatabaseName("ix_customer_risk_indicator_evaluations_indicator_id");
+
+                    b.HasIndex("EvaluationId", "IndicatorId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_customer_risk_indicator_evaluations_unique");
+
+                    b.ToTable("customer_risk_indicator_evaluations", "public");
+                });
+
+            modelBuilder.Entity("Domain.RiskEvaluations.RiskIndicator", b =>
+                {
+                    b.Property<Guid>("IndicatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("indicator_id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("PossibleValues")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("Yes,No,N/A")
+                        .HasColumnName("possible_values");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("IndicatorId")
+                        .HasName("pk_risk_indicators");
+
+                    b.HasIndex("Category", "DisplayOrder")
+                        .HasDatabaseName("ix_risk_indicators_category_display_order");
+
+                    b.ToTable("risk_indicators", "public");
+                });
+
             modelBuilder.Entity("Domain.RolePermissions.RolePermission", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1213,6 +1466,27 @@ namespace Infrastructure.Database.Migrations
                     b.Navigation("FileDetails");
                 });
 
+            modelBuilder.Entity("Domain.RiskEvaluations.CustomerRiskIndicatorEvaluation", b =>
+                {
+                    b.HasOne("Domain.RiskEvaluations.CustomerRiskEvaluation", "Evaluation")
+                        .WithMany("IndicatorEvaluations")
+                        .HasForeignKey("EvaluationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_risk_indicator_evaluations_customer_risk_evaluatio");
+
+                    b.HasOne("Domain.RiskEvaluations.RiskIndicator", "Indicator")
+                        .WithMany()
+                        .HasForeignKey("IndicatorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_risk_indicator_evaluations_risk_indicators_indicat");
+
+                    b.Navigation("Evaluation");
+
+                    b.Navigation("Indicator");
+                });
+
             modelBuilder.Entity("Domain.RolePermissions.RolePermission", b =>
                 {
                     b.HasOne("Domain.Permissions.Permission", "Permission")
@@ -1316,6 +1590,11 @@ namespace Infrastructure.Database.Migrations
             modelBuilder.Entity("Domain.ProductCategories.ProductCategory", b =>
                 {
                     b.Navigation("Segments");
+                });
+
+            modelBuilder.Entity("Domain.RiskEvaluations.CustomerRiskEvaluation", b =>
+                {
+                    b.Navigation("IndicatorEvaluations");
                 });
 
             modelBuilder.Entity("Domain.Segments.Segment", b =>

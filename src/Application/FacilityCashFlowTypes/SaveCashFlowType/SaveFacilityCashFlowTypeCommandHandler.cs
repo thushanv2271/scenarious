@@ -2,29 +2,41 @@
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.FacilityCashFlowTypes.SaveCashFlowType.Validators;
 using Domain.FacilityCashFlowTypes;
 using Domain.Scenarios;
 using Domain.Segments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using SharedKernel;
 
 namespace Application.FacilityCashFlowTypes.SaveCashFlowType;
 
+/// <summary>
+/// Handler to save facility cash flow type configuration
+/// Delegates validation to specialized validators
+/// </summary>
 internal sealed class SaveFacilityCashFlowTypeCommandHandler(
     IApplicationDbContext context,
+    ILoanDetailsRepository loanRepository,
     IUserContext userContext,
     IDateTimeProvider dateTimeProvider,
+    ICashFlowConfigurationValidator configurationValidator,
     ILogger<SaveFacilityCashFlowTypeCommandHandler> logger)
     : ICommandHandler<SaveFacilityCashFlowTypeCommand, SaveFacilityCashFlowTypeResponse>
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public async Task<Result<SaveFacilityCashFlowTypeResponse>> Handle(
         SaveFacilityCashFlowTypeCommand command,
         CancellationToken cancellationToken)
     {
         try
         {
+            // Step 1: Validate segment exists
             Segment? segment = await context.Segments
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == command.SegmentId, cancellationToken);
@@ -36,6 +48,7 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                     FacilityCashFlowTypeErrors.SegmentNotFound(command.SegmentId));
             }
 
+            // Step 2: Validate scenario exists and is linked to segment
             Scenario? scenario = await context.Scenarios
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == command.ScenarioId, cancellationToken);
@@ -50,27 +63,33 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
             if (scenario.SegmentId != command.SegmentId)
             {
                 logger.LogWarning(
-                    "Scenario {ScenarioId} is not linked to segment {SegmentId}",
+                    "Scenario {ScenarioId} not linked to segment {SegmentId}",
                     command.ScenarioId, command.SegmentId);
                 return Result.Failure<SaveFacilityCashFlowTypeResponse>(
                     FacilityCashFlowTypeErrors.ScenarioNotLinkedToSegment);
             }
 
-            Result<LoanDetail> facilityValidationResult = await ValidateFacilityAsync(
-                command.FacilityNumber,
-                segment,
-                cancellationToken);
+            // Step 3: Validate facility exists and matches segment
+            FacilityBasicDetail? facilityDetail = await loanRepository
+                .GetFacilityBasicDetailsAsync(command.FacilityNumber, cancellationToken);
 
-            if (facilityValidationResult.IsFailure)
+            if (facilityDetail == null)
             {
-                logger.LogWarning(
-                    "Facility validation failed for {FacilityNumber}: {Error}",
-                    command.FacilityNumber,
-                    facilityValidationResult.Error.Description);
+                logger.LogWarning("Facility not found: {FacilityNumber}", command.FacilityNumber);
                 return Result.Failure<SaveFacilityCashFlowTypeResponse>(
-                    facilityValidationResult.Error);
+                    FacilityCashFlowTypeErrors.FacilityNotFound(command.FacilityNumber));
             }
 
+            if (!facilityDetail.Segment.Equals(segment.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning(
+                    "Facility segment mismatch. Expected: {ExpectedSegment}, Found: {ActualSegment}",
+                    segment.Name, facilityDetail.Segment);
+                return Result.Failure<SaveFacilityCashFlowTypeResponse>(
+                    FacilityCashFlowTypeErrors.FacilitySegmentMismatch);
+            }
+
+            // Step 4: Check for duplicate active configuration
             bool existingActiveType = await context.FacilityCashFlowTypes
                 .AnyAsync(f =>
                     f.FacilityNumber == command.FacilityNumber &&
@@ -87,25 +106,24 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                     FacilityCashFlowTypeErrors.DuplicateActiveCashFlowType);
             }
 
-            Result configurationValidation = ValidateConfiguration(
+            // Step 5: Validate configuration using specialized validator
+            Result configurationValidation = configurationValidator.Validate(
                 command.CashFlowType,
                 command.Configuration);
 
             if (configurationValidation.IsFailure)
             {
                 logger.LogWarning(
-                    "Configuration validation failed for cash flow type {CashFlowType}: {Error}",
-                    command.CashFlowType,
-                    configurationValidation.Error.Description);
+                    "Configuration validation failed for {CashFlowType}: {Error}",
+                    command.CashFlowType, configurationValidation.Error.Description);
                 return Result.Failure<SaveFacilityCashFlowTypeResponse>(
                     configurationValidation.Error);
             }
 
-#pragma warning disable CA1869
+            // Step 6: Create and save entity
             string configurationJson = JsonSerializer.Serialize(
                 command.Configuration,
-                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-#pragma warning restore CA1869
+                JsonOptions);
 
             var facilityCashFlowType = new FacilityCashFlowType
             {
@@ -128,6 +146,7 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                 "Created cash flow type {CashFlowType} for facility {FacilityNumber}, scenario {ScenarioId}",
                 command.CashFlowType, command.FacilityNumber, command.ScenarioId);
 
+            // Step 7: Get user name for response
             var user = await context.Users
                 .AsNoTracking()
                 .Where(u => u.Id == userContext.UserId)
@@ -147,7 +166,7 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                 ScenarioId = scenario.Id,
                 ScenarioName = scenario.ScenarioName,
                 CashFlowType = facilityCashFlowType.CashFlowType,
-                CashFlowTypeName = GetCashFlowTypeName(facilityCashFlowType.CashFlowType),
+                CashFlowTypeName = CashFlowTypeNames.GetName(facilityCashFlowType.CashFlowType),
                 Configuration = command.Configuration,
                 IsActive = facilityCashFlowType.IsActive,
                 CreatedAt = facilityCashFlowType.CreatedAt,
@@ -168,275 +187,5 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
                     "FacilityCashFlowType.SaveError",
                     $"An error occurred while saving the cash flow type: {ex.Message}"));
         }
-    }
-
-    private async Task<Result<LoanDetail>> ValidateFacilityAsync(
-        string facilityNumber,
-        Segment segment,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var dbContext = context as DbContext;
-            string? connectionString = dbContext?.Database.GetConnectionString();
-
-            if (string.IsNullOrEmpty(connectionString))
-            {
-                logger.LogError("Database connection string not found");
-                return Result.Failure<LoanDetail>(
-                    Error.Failure(
-                        "Database.ConnectionError",
-                        "Database connection string not found"));
-            }
-
-            await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(cancellationToken);
-
-            string sql = @"
-                SELECT 
-                    customer_number,
-                    facility_number,
-                    product_category,
-                    segment,
-                    branch,
-                    SUM(total_os) as total_os,
-                    MAX(interest_rate) as interest_rate,
-                    MIN(grant_date) as grant_date,
-                    MAX(maturity_date) as maturity_date,
-                    MAX(days_past_due) as days_past_due
-                FROM loan_details
-                WHERE facility_number = @facilityNumber
-                GROUP BY customer_number, facility_number, product_category, segment, branch
-                LIMIT 1";
-
-            await using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@facilityNumber", facilityNumber);
-
-            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
-            {
-                logger.LogWarning("Facility not found in loan_details: {FacilityNumber}", facilityNumber);
-                return Result.Failure<LoanDetail>(
-                    FacilityCashFlowTypeErrors.FacilityNotFound(facilityNumber));
-            }
-
-            var loanDetail = new LoanDetail
-            {
-                CustomerNumber = reader.GetString(0),
-                FacilityNumber = reader.GetString(1),
-                ProductCategory = reader.GetString(2),
-                Segment = reader.GetString(3),
-                Branch = reader.GetString(4),
-                TotalOs = reader.GetDecimal(5),
-                InterestRate = reader.GetDecimal(6),
-                GrantDate = reader.GetDateTime(7),
-                MaturityDate = reader.GetDateTime(8),
-                DaysInArrears = reader.GetInt32(9)
-            };
-
-            if (!loanDetail.Segment.Equals(segment.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                logger.LogWarning(
-                    "Segment mismatch for facility {FacilityNumber}. Expected: {ExpectedSegment}, Found: {ActualSegment}",
-                    facilityNumber, segment.Name, loanDetail.Segment);
-                return Result.Failure<LoanDetail>(
-                    FacilityCashFlowTypeErrors.FacilitySegmentMismatch);
-            }
-
-            logger.LogInformation(
-                "Facility validated: {FacilityNumber}, Customer: {CustomerNumber}, Segment: {Segment}",
-                loanDetail.FacilityNumber, loanDetail.CustomerNumber, loanDetail.Segment);
-
-            return Result.Success(loanDetail);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error validating facility {FacilityNumber}", facilityNumber);
-            return Result.Failure<LoanDetail>(
-                Error.Failure(
-                    "FacilityCashFlowType.ValidationError",
-                    $"Error validating facility: {ex.Message}"));
-        }
-    }
-
-    private static Result ValidateConfiguration(
-        CashFlowsType cashFlowType,
-        CashFlowConfigurationDto configuration)
-    {
-        return cashFlowType switch
-        {
-            CashFlowsType.ContractualCashFlows =>
-                Result.Success(),
-
-            CashFlowsType.ContractModification =>
-                ValidateContractModificationConfiguration(configuration),
-
-            CashFlowsType.CollateralRealization =>
-                ValidateCollateralConfiguration(configuration),
-
-            CashFlowsType.LastQuarterCashFlows =>
-                ValidateLastQuarterConfiguration(configuration),
-
-            CashFlowsType.OtherCashFlows =>
-                ValidateOtherCashFlowsConfiguration(configuration),
-
-            _ => Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    $"Unknown cash flow type: {cashFlowType}"))
-        };
-    }
-
-    private static Result ValidateContractModificationConfiguration(
-        CashFlowConfigurationDto configuration)
-    {
-        // Allow either parameter-based OR file-based configuration
-        bool hasParameters = !string.IsNullOrWhiteSpace(configuration.Frequency) &&
-                            configuration.Value.HasValue &&
-                            configuration.TenureMonths.HasValue;
-
-        bool hasFile = configuration.UploadedFileId.HasValue;
-
-        if (!hasParameters && !hasFile)
-        {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Contract modification requires either payment parameters (frequency, value, tenure) or an uploaded payment schedule file"));
-        }
-
-        if (hasParameters)
-        {
-#pragma warning disable CS8629 // Nullable value type may be null.
-            if (configuration.Value.Value <= 0)
-            {
-                return Result.Failure(
-                    FacilityCashFlowTypeErrors.InvalidConfiguration(
-                        "Value must be greater than zero"));
-            }
-#pragma warning restore CS8629 // Nullable value type may be null.
-
-#pragma warning disable CS8629 // Nullable value type may be null.
-            if (configuration.TenureMonths.Value <= 0)
-            {
-                return Result.Failure(
-                    FacilityCashFlowTypeErrors.InvalidConfiguration(
-                        "Tenure months must be greater than zero"));
-            }
-#pragma warning restore CS8629 // Nullable value type may be null.
-
-            string[] validFrequencies = new[] { "Monthly", "Quarterly", "Annually" };
-            if (!validFrequencies.Contains(configuration.Frequency, StringComparer.OrdinalIgnoreCase))
-            {
-                return Result.Failure(
-                    FacilityCashFlowTypeErrors.InvalidConfiguration(
-                        "Frequency must be Monthly, Quarterly, or Annually"));
-            }
-        }
-
-        return Result.Success();
-    }
-
-    private static Result ValidateCollateralConfiguration(
-        CashFlowConfigurationDto configuration)
-    {
-        if (!configuration.CollateralValue.HasValue || configuration.CollateralValue.Value <= 0)
-        {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Collateral value must be greater than zero"));
-        }
-
-        if (!configuration.RealizationMonth.HasValue || configuration.RealizationMonth.Value <= 0)
-        {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Realization month must be greater than zero"));
-        }
-
-        if (!configuration.HaircutPercentage.HasValue)
-        {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Haircut percentage is required"));
-        }
-
-        if (configuration.HaircutPercentage.Value < 0 || configuration.HaircutPercentage.Value > 1)
-        {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Haircut percentage must be between 0 and 1 (e.g., 0.40 for 40%)"));
-        }
-
-        return Result.Success();
-    }
-
-    private static Result ValidateLastQuarterConfiguration(
-        CashFlowConfigurationDto configuration)
-    {
-        if (!configuration.UploadedFileId.HasValue)
-        {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Uploaded file ID is required for last quarter cash flows"));
-        }
-
-        return Result.Success();
-    }
-
-    private static Result ValidateOtherCashFlowsConfiguration(
-        CashFlowConfigurationDto configuration)
-    {
-        if (configuration.CustomCashFlows == null || !configuration.CustomCashFlows.Any())
-        {
-            return Result.Failure(
-                FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Custom cash flows are required for other cash flow type"));
-        }
-
-        foreach (CustomCashFlowDto cashFlow in configuration.CustomCashFlows)
-        {
-            if (cashFlow.Month <= 0)
-            {
-                return Result.Failure(
-                    FacilityCashFlowTypeErrors.InvalidConfiguration(
-                        "Month number must be greater than zero"));
-            }
-
-            if (cashFlow.Amount <= 0)
-            {
-                return Result.Failure(
-                    FacilityCashFlowTypeErrors.InvalidConfiguration(
-                        "Cash flow amount must be greater than zero"));
-            }
-        }
-
-        return Result.Success();
-    }
-
-    private static string GetCashFlowTypeName(CashFlowsType cashFlowType)
-    {
-        return cashFlowType switch
-        {
-            CashFlowsType.ContractualCashFlows => "Contractual Cash Flows",
-            CashFlowsType.ContractModification => "Contract Modification",
-            CashFlowsType.CollateralRealization => "Collateral Realization",
-            CashFlowsType.LastQuarterCashFlows => "Last Quarter Cash Flows",
-            CashFlowsType.OtherCashFlows => "Other Cash Flows",
-            _ => "Unknown"
-        };
-    }
-
-    private sealed class LoanDetail
-    {
-        public string CustomerNumber { get; init; } = string.Empty;
-        public string FacilityNumber { get; init; } = string.Empty;
-        public string ProductCategory { get; init; } = string.Empty;
-        public string Segment { get; init; } = string.Empty;
-        public string Branch { get; init; } = string.Empty;
-        public decimal TotalOs { get; init; }
-        public decimal InterestRate { get; init; }
-        public DateTime GrantDate { get; init; }
-        public DateTime MaturityDate { get; init; }
-        public int DaysInArrears { get; init; }
     }
 }

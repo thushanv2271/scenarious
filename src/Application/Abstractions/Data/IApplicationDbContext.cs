@@ -1,9 +1,12 @@
-﻿using Domain.Authentication;
+﻿using System.Collections.Generic;
+using Domain.Authentication;
 using Domain.Branches;
+using Domain.Configurations;
 using Domain.EfaConfigs;
 using Domain.Exports;
 using Domain.FacilityCashFlowTypes;
 using Domain.Files;
+using Domain.CollectiveImpairment;
 using Domain.Industries;
 using Domain.MasterData;
 using Domain.Organizations;
@@ -11,6 +14,7 @@ using Domain.PasswordResetTokens;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
+using Domain.RiskEvaluations;
 using Domain.RolePermissions;
 using Domain.Roles;
 using Domain.Scenarios;
@@ -19,6 +23,7 @@ using Domain.Todos;
 using Domain.UserRoles;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using SharedKernel;
 using Domain.PDCalculation;
 
@@ -41,10 +46,12 @@ public interface IApplicationDbContext
     DbSet<ExportAudit> ExportAudits { get; }
 
     DbSet<PDTempData> PDTempDatas { get; }
+    DbSet<CollectiveImpairmentConfig> CollectiveImpairmentConfigs { get; }
 
     DbSet<SegmentMaster> SegmentMasters { get; }
 
     DbSet<UploadedFile> UploadedFiles { get; }
+    DbSet<FileValidationResult> FileValidationResults { get; }
     // PD Calculation entities
     DbSet<FileDetails> FileDetails { get; }
     DbSet<LoanDetails> LoanDetails { get; }
@@ -60,6 +67,14 @@ public interface IApplicationDbContext
     DbSet<Industry> Industries { get; }
     DbSet<Scenario> Scenarios { get; }
     DbSet<FacilityCashFlowType> FacilityCashFlowTypes { get; }
+
+    DbSet<RiskIndicator> RiskIndicators { get; }
+    DbSet<CustomerRiskEvaluation> CustomerRiskEvaluations { get; }
+    DbSet<CustomerRiskIndicatorEvaluation> CustomerRiskIndicatorEvaluations { get; }
+
+    DbSet<AgeBucketConfiguration> AgeBucketConfigurations { get; }
+    
+    DatabaseFacade Database { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

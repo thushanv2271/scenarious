@@ -5,6 +5,7 @@ using Application.Abstractions.Data;
 using Application.DTOs.PD;
 using Application.Models;
 using Application.Services;
+using Domain.PDCalculation;
 using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -93,13 +94,47 @@ public class Step2GenerateMigrationMatrices
 
         try
         {
-            // Get all distinct periods from loan details, ordered chronologically
-            List<string> distinctPeriods = await _dbContext.LoanDetails
+            // Get segment configurations and frequency for validation
+            List<PDConfiguration> segmentConfigurations = _pdConfiguration;
+            string frequency = _timeConfig.Frequency;
+
+            //Get segment list from segmentConfigurations
+            var segments = segmentConfigurations.Select(sc => sc.Segment).Distinct().ToList();
+
+            // Load only the loan details that match those segments
+            List<LoanDetailSlim> loanDetails = await _dbContext.LoanDetails
+                .Where(ld => segments.Contains(ld.Segment))
+                .AsNoTracking()
+                .Select(ld => new LoanDetailSlim
+                {
+                    Period = ld.Period,
+                    ProductCategory = ld.ProductCategory,
+                    Segment = ld.Segment,
+                    CustomerNumber = ld.CustomerNumber,
+                    FacilityNumber = ld.FacilityNumber,
+                    FinalBucket = ld.FinalBucket
+                })
+                .ToListAsync(cancellationToken);
+
+            if (loanDetails.Count == 0)
+            {
+                _logger.LogWarning("No loan details found for migration matrix preparation");
+                return Array.Empty<PdMigrationDataset>();
+            }
+
+            // lookup
+            var lookup = loanDetails
+                .GroupBy(ld => (ld.Period, ld.ProductCategory, ld.Segment))
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+
+            // Get all distinct periods from load details
+            var distinctPeriods = loanDetails
                 .Where(ld => !string.IsNullOrEmpty(ld.Period))
                 .Select(ld => ld.Period)
                 .Distinct()
                 .OrderBy(p => p)
-                .ToListAsync(cancellationToken);
+                .ToList(); 
 
             if (distinctPeriods.Count < 2)
             {
@@ -108,10 +143,6 @@ public class Step2GenerateMigrationMatrices
             }
 
             _logger.LogInformation("Found {Count} distinct periods: {Periods}", distinctPeriods.Count, string.Join(", ", distinctPeriods));
-
-            // Get segment configurations and frequency for validation
-            List<PDConfiguration> segmentConfigurations = _pdConfiguration;
-            string frequency = _timeConfig.Frequency;
 
             if (segmentConfigurations.Count == 0)
             {
@@ -133,8 +164,8 @@ public class Step2GenerateMigrationMatrices
                 string periodN = distinctPeriods[i];
 
                 // Calculate period differences and create product category datasets
-                IReadOnlyList<PdProductCategoryMigrationData> productCategoryDatasets = await CreateProductCategoryMigrationDataAsync(
-                    periodN, segmentConfigurations, distinctPeriods, frequency, worstBucket ?? string.Empty, cancellationToken);
+                List<PdProductCategoryMigrationData> productCategoryDatasets = CreateProductCategoryMigrationData(
+                    periodN, segmentConfigurations, distinctPeriods, frequency, worstBucket ?? string.Empty, lookup);
 
                 _logger.LogInformation("Processing period pair for period: {PeriodN}", periodN);
                 if (productCategoryDatasets.Count > 0)
@@ -252,41 +283,23 @@ public class Step2GenerateMigrationMatrices
     /// <summary>
     /// Creates migration rows for a specific segment and product category combination for a period pair
     /// </summary>
-    private async Task<IReadOnlyList<PdMigrationRowDto>> CreateMigrationRowsForSegmentAsync(
+    private List<PdMigrationRowDto> CreateMigrationRowsForSegment(
         string periodNMinus1,
         string periodN,
         PDConfiguration segmentConfig,
         string worstBucket,
-        CancellationToken cancellationToken = default)
+        Dictionary<(string Period, string ProductCategory, string Segment), List<LoanDetailSlim>> lookup)
     {
         // Get loan details for both periods filtered by both product category and segment
-        var loanDetailsNMinus1 = await _dbContext.LoanDetails
-            .Where(ld => ld.Period == periodNMinus1
-                && ld.ProductCategory == segmentConfig.ProductCategory
-                && ld.Segment == segmentConfig.Segment)
-            .Select(ld => new
-            {
-                ld.CustomerNumber,
-                ld.FacilityNumber,
-                ld.FinalBucket,
-                ld.ProductCategory,
-                ld.Segment
-            })
-            .ToListAsync(cancellationToken);
+        lookup.TryGetValue((periodNMinus1, segmentConfig.ProductCategory, segmentConfig.Segment),
+            out List<LoanDetailSlim>? loanDetailsNMinus1);
 
-        var loanDetailsN = await _dbContext.LoanDetails
-            .Where(ld => ld.Period == periodN
-                && ld.ProductCategory == segmentConfig.ProductCategory
-                && ld.Segment == segmentConfig.Segment)
-            .Select(ld => new
-            {
-                ld.CustomerNumber,
-                ld.FacilityNumber,
-                ld.FinalBucket,
-                ld.ProductCategory,
-                ld.Segment
-            })
-            .ToListAsync(cancellationToken);
+        loanDetailsNMinus1 ??= new List<LoanDetailSlim>();
+        
+        lookup.TryGetValue((periodN, segmentConfig.ProductCategory, segmentConfig.Segment),
+            out List<LoanDetailSlim>? loanDetailsN);
+
+        loanDetailsN ??= new List<LoanDetailSlim>();
 
         _logger.LogDebug("Found {CountNMinus1} loans in period {PeriodNMinus1} and {CountN} loans in period {PeriodN} for ProductCategory {ProductCategory}, Segment {Segment}",
             loanDetailsNMinus1.Count, periodNMinus1, loanDetailsN.Count, periodN, segmentConfig.ProductCategory, segmentConfig.Segment);
@@ -298,7 +311,7 @@ public class Step2GenerateMigrationMatrices
         // Find matching customer/facility combinations and create migration rows
         List<PdMigrationRowDto> migrationRows = new();
 
-        foreach (var loanNMinus1 in loanDetailsNMinus1)
+        foreach (LoanDetailSlim loanNMinus1 in loanDetailsNMinus1)
         {
             var key = new { loanNMinus1.CustomerNumber, loanNMinus1.FacilityNumber };
             string loanNFinalBucket = periodNLookup[key].FirstOrDefault() ?? string.Empty;
@@ -594,13 +607,13 @@ public class Step2GenerateMigrationMatrices
     /// <summary>
     /// Creates product category-specific migration data for a period pair, grouping segments by product category
     /// </summary>
-    private async Task<IReadOnlyList<PdProductCategoryMigrationData>> CreateProductCategoryMigrationDataAsync(
+    private List<PdProductCategoryMigrationData> CreateProductCategoryMigrationData(
         string periodN,
         List<PDConfiguration> segmentConfigurations,
         List<string> distinctPeriods,
         string frequency,
         string worstBucket,
-        CancellationToken cancellationToken = default)
+        Dictionary<(string Period, string ProductCategory, string Segment), List<LoanDetailSlim>> lookup)
     {
         List<PdProductCategoryMigrationData> productCategoryDatasets = new();
 
@@ -628,8 +641,8 @@ public class Step2GenerateMigrationMatrices
                 }
 
                 // Create migration rows for this specific segment and product category combination
-                IReadOnlyList<PdMigrationRowDto> migrationRows = await CreateMigrationRowsForSegmentAsync(
-                    adjustedPeriodNMinus1, periodN, segmentConfig, worstBucket, cancellationToken);
+                List<PdMigrationRowDto> migrationRows = CreateMigrationRowsForSegment(
+                    adjustedPeriodNMinus1, periodN, segmentConfig, worstBucket, lookup);
 
                 if (migrationRows.Count > 0)
                 {

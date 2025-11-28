@@ -8,6 +8,7 @@ public static class Tags
     public const string Roles = "Roles";
     public const string ProductCategories = "Product Categories";
     public const string EclAnalysis = "ECL Analysis";
+    public const string CollectiveImpairment = "Collective Impairment";
     public const string CashFlowTypes = "Cash Flow Types";
     public const string CashFlowProjections = "Cash Flow Projections";
 }

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Application.Abstractions.Calculations;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Parsing;
@@ -7,14 +8,19 @@ using Domain.FacilityCashFlowTypes;
 using Domain.Files;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using SharedKernel;
 
 namespace Application.CashFlowProjections.GetContractualCashFlows;
 
+/// <summary>
+/// Handler to retrieve contractual cash flows for a facility
+/// Delegates calculations to ICashFlowCalculationService
+/// </summary>
 internal sealed class GetContractualCashFlowsQueryHandler(
+    ILoanDetailsRepository loanRepository,
     IApplicationDbContext context,
     IExcelCashFlowParser excelParser,
+    ICashFlowCalculationService calculationService,
     ILogger<GetContractualCashFlowsQueryHandler> logger)
     : IQueryHandler<GetContractualCashFlowsQuery, ContractualCashFlowsResponse>
 {
@@ -29,39 +35,11 @@ internal sealed class GetContractualCashFlowsQueryHandler(
     {
         try
         {
-            var dbContext = context as DbContext;
-            string? connectionString = dbContext?.Database.GetConnectionString();
+            // Step 1: Get loan details from repository
+            FacilityLoanDetail? loanDetail = await loanRepository
+                .GetFacilityLoanDetailsAsync(query.FacilityNumber, cancellationToken);
 
-            if (string.IsNullOrEmpty(connectionString))
-            {
-                logger.LogError("Database connection string not found");
-                return Result.Failure<ContractualCashFlowsResponse>(
-                    Error.Failure("Database.ConnectionError", "Database connection string not found"));
-            }
-
-            await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(cancellationToken);
-
-            string sql = @"
-                SELECT 
-                    customer_number,
-                    facility_number,
-                    total_os,
-                    interest_rate,
-                    grant_date,
-                    maturity_date,
-                    installment_type
-                FROM loan_details
-                WHERE facility_number = @facilityNumber
-                ORDER BY period DESC
-                LIMIT 1";
-
-            await using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@facilityNumber", query.FacilityNumber);
-
-            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (loanDetail == null)
             {
                 logger.LogWarning("Facility not found: {FacilityNumber}", query.FacilityNumber);
                 return Result.Failure<ContractualCashFlowsResponse>(
@@ -69,65 +47,39 @@ internal sealed class GetContractualCashFlowsQueryHandler(
                         $"Facility {query.FacilityNumber} not found in portfolio snapshot"));
             }
 
-            string customerNumber = reader.GetString(0);
-            string facilityNumber = reader.GetString(1);
-            decimal totalOutstanding = reader.GetDecimal(2);
-            decimal interestRate = reader.GetDecimal(3);
-            DateTime grantDate = reader.GetDateTime(4);
-            DateTime maturityDate = reader.GetDateTime(5);
-            string installmentType = reader.GetString(6);
+            // Step 2: Calculate tenure
+            int tenureMonths = calculationService.CalculateTenureMonths(loanDetail.MaturityDate);
 
-            int tenureMonths = CalculateTenureMonths(maturityDate);
-
-            FacilityCashFlowType? savedConfig = await context.FacilityCashFlowTypes
-                .AsNoTracking()
-                .Where(f => f.FacilityNumber == query.FacilityNumber &&
-                           (f.CashFlowType == Domain.FacilityCashFlowTypes.CashFlowsType.ContractualCashFlows ||
-                            f.CashFlowType == Domain.FacilityCashFlowTypes.CashFlowsType.ContractModification) &&
-                           f.IsActive)
-                .FirstOrDefaultAsync(cancellationToken);
+            // Step 3: Try to get uploaded payment schedule
+            Result<List<MonthlyCashFlow>>? uploadedCashFlows = await TryGetUploadedCashFlowsAsync(
+                query.FacilityNumber, cancellationToken);
 
             List<MonthlyCashFlow> cashFlows;
-
-            if (savedConfig != null)
+            if (uploadedCashFlows != null && uploadedCashFlows.IsSuccess)
             {
-                Result<List<MonthlyCashFlow>>? uploadedCashFlows = await TryGetUploadedCashFlowsAsync(
-                    savedConfig, query.FacilityNumber, cancellationToken);
-
-                if (uploadedCashFlows != null)
-                {
-                    return Result.Success(new ContractualCashFlowsResponse
-                    {
-                        FacilityNumber = facilityNumber,
-                        CustomerNumber = customerNumber,
-                        AmortisedCost = totalOutstanding,
-                        InterestRate = interestRate,
-                        GrantDate = grantDate,
-                        MaturityDate = maturityDate,
-                        TenureMonths = tenureMonths,
-                        InstallmentType = installmentType,
-                        ProjectedCashFlows = uploadedCashFlows.Value
-                    });
-                }
+                cashFlows = uploadedCashFlows.Value;
             }
-
-            cashFlows = GenerateCashFlowProjections(
-                totalOutstanding,
-                interestRate,
-                tenureMonths,
-                installmentType,
-                DateTime.UtcNow);
+            else
+            {
+                // Step 4: Generate cash flows using calculation service
+                cashFlows = calculationService.GenerateCashFlowProjections(
+                    loanDetail.TotalOutstanding,
+                    loanDetail.InterestRate,
+                    tenureMonths,
+                    loanDetail.InstallmentType,
+                    DateTime.UtcNow);
+            }
 
             var response = new ContractualCashFlowsResponse
             {
-                FacilityNumber = facilityNumber,
-                CustomerNumber = customerNumber,
-                AmortisedCost = totalOutstanding,
-                InterestRate = interestRate,
-                GrantDate = grantDate,
-                MaturityDate = maturityDate,
+                FacilityNumber = loanDetail.FacilityNumber,
+                CustomerNumber = loanDetail.CustomerNumber,
+                AmortisedCost = loanDetail.TotalOutstanding,
+                InterestRate = loanDetail.InterestRate,
+                GrantDate = loanDetail.GrantDate,
+                MaturityDate = loanDetail.MaturityDate,
                 TenureMonths = tenureMonths,
-                InstallmentType = installmentType,
+                InstallmentType = loanDetail.InstallmentType,
                 ProjectedCashFlows = cashFlows
             };
 
@@ -148,30 +100,30 @@ internal sealed class GetContractualCashFlowsQueryHandler(
         }
     }
 
-    private int CalculateTenureMonths(DateTime maturityDate)
-    {
-        int tenureMonths = (maturityDate.Year - DateTime.UtcNow.Year) * 12 +
-                           maturityDate.Month - DateTime.UtcNow.Month;
-
-        if (tenureMonths <= 0)
-        {
-            logger.LogWarning("Facility has already matured, using minimum tenure");
-            return 1;
-        }
-
-        return tenureMonths;
-    }
-
+    /// <summary>
+    /// Attempts to get uploaded payment schedule
+    /// </summary>
     private async Task<Result<List<MonthlyCashFlow>>?> TryGetUploadedCashFlowsAsync(
-        FacilityCashFlowType savedConfig,
         string facilityNumber,
         CancellationToken cancellationToken)
     {
         try
         {
+            FacilityCashFlowType? savedConfig = await context.FacilityCashFlowTypes
+                .AsNoTracking()
+                .Where(f => f.FacilityNumber == facilityNumber &&
+                           (f.CashFlowType == CashFlowsType.ContractualCashFlows ||
+                            f.CashFlowType == CashFlowsType.ContractModification) &&
+                           f.IsActive)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (savedConfig == null)
+            {
+                return null;
+            }
+
             CashFlowConfigurationDto? config = JsonSerializer.Deserialize<CashFlowConfigurationDto>(
-                savedConfig.Configuration,
-                JsonOptions);
+                savedConfig.Configuration, JsonOptions);
 
             if (config?.UploadedFileId == null)
             {
@@ -188,8 +140,7 @@ internal sealed class GetContractualCashFlowsQueryHandler(
             }
 
             Result<List<ParsedCashFlow>> parseResult = await excelParser.ParseCashFlowsAsync(
-                uploadedFile.PhysicalPath,
-                cancellationToken);
+                uploadedFile.PhysicalPath, cancellationToken);
 
             if (parseResult.IsFailure)
             {
@@ -214,83 +165,9 @@ internal sealed class GetContractualCashFlowsQueryHandler(
         catch (Exception ex)
         {
             logger.LogWarning(ex,
-                "Failed to use uploaded payment schedule for facility {FacilityNumber}, falling back to calculation",
+                "Failed to use uploaded payment schedule for facility {FacilityNumber}",
                 facilityNumber);
             return null;
         }
-    }
-
-    private static List<MonthlyCashFlow> GenerateCashFlowProjections(
-        decimal totalOutstanding,
-        decimal annualInterestRate,
-        int tenureMonths,
-        string installmentType,
-        DateTime startDate)
-    {
-        var cashFlows = new List<MonthlyCashFlow>();
-        decimal monthlyInterestRate = annualInterestRate / 100 / 12;
-        decimal remainingPrincipal = totalOutstanding;
-
-        for (int month = 1; month <= tenureMonths; month++)
-        {
-            decimal interestAmount = remainingPrincipal * monthlyInterestRate;
-            decimal principalAmount = CalculatePrincipalAmount(
-                totalOutstanding,
-                remainingPrincipal,
-                monthlyInterestRate,
-                tenureMonths,
-                installmentType,
-                month);
-
-            decimal totalAmount = principalAmount + interestAmount;
-            remainingPrincipal -= principalAmount;
-
-            cashFlows.Add(new MonthlyCashFlow
-            {
-                Month = month,
-                PrincipalAmount = Math.Round(principalAmount, 2),
-                InterestAmount = Math.Round(interestAmount, 2),
-                TotalAmount = Math.Round(totalAmount, 2),
-                PaymentDate = startDate.AddMonths(month)
-            });
-        }
-
-        return cashFlows;
-    }
-
-    private static decimal CalculatePrincipalAmount(
-        decimal totalOutstanding,
-        decimal remainingPrincipal,
-        decimal monthlyInterestRate,
-        int tenureMonths,
-        string installmentType,
-        int currentMonth)
-    {
-        if (installmentType.Contains("Equal", StringComparison.OrdinalIgnoreCase))
-        {
-            decimal emi = CalculateEMI(totalOutstanding, monthlyInterestRate, tenureMonths);
-            decimal interestAmount = remainingPrincipal * monthlyInterestRate;
-            return emi - interestAmount;
-        }
-
-        if (installmentType.Contains("Bullet", StringComparison.OrdinalIgnoreCase))
-        {
-            return currentMonth == tenureMonths ? remainingPrincipal : 0;
-        }
-
-        return totalOutstanding / tenureMonths;
-    }
-
-    private static decimal CalculateEMI(decimal principal, decimal monthlyRate, int months)
-    {
-        if (monthlyRate == 0)
-        {
-            return principal / months;
-        }
-
-        decimal numerator = principal * monthlyRate * (decimal)Math.Pow((double)(1 + monthlyRate), months);
-        decimal denominator = (decimal)Math.Pow((double)(1 + monthlyRate), months) - 1;
-
-        return numerator / denominator;
     }
 }

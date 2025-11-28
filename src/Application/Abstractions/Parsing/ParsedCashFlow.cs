@@ -1,5 +1,6 @@
 ﻿namespace Application.Abstractions.Parsing;
 
-public class ParsedCashFlow
-{
-}
+/// <summary>
+/// Represents a parsed cash flow entry from Excel file
+/// </summary>
+public sealed record ParsedCashFlow(int Month, decimal CashFlow);

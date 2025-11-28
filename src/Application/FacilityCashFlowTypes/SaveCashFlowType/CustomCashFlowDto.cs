@@ -7,3 +7,4 @@ public sealed record CustomCashFlowDto(
     int Month,
     decimal Amount
 );
+

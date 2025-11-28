@@ -44,9 +44,7 @@ internal sealed class ExcelCashFlowParser(ILogger<ExcelCashFlowParser> logger) :
         IXLRow headerRow = worksheet.Row(1);
         foreach (IXLCell cell in headerRow.CellsUsed())
         {
-#pragma warning disable CA1304 // Specify CultureInfo
-            string headerValue = cell.Value.ToString().Trim().ToUpperInvariant();
-#pragma warning restore CA1304 // Specify CultureInfo
+            string headerValue = cell.GetString().Trim().ToUpperInvariant();
 
             if (headerValue == "MONTH")
             {
@@ -88,21 +86,17 @@ internal sealed class ExcelCashFlowParser(ILogger<ExcelCashFlowParser> logger) :
                 continue;
             }
 
-#pragma warning disable CA1304 // Specify CultureInfo
-            if (!int.TryParse(monthCell.Value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int month))
+            if (!int.TryParse(monthCell.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int month))
             {
-                logger.LogWarning("Invalid month value at row {Row}: {Value}", row, monthCell.Value);
+                logger.LogWarning("Invalid month value at row {Row}: {Value}", row, monthCell.GetString());
                 continue;
             }
-#pragma warning restore CA1304 // Specify CultureInfo
 
-#pragma warning disable CA1304 // Specify CultureInfo
-            if (!decimal.TryParse(cashFlowCell.Value.ToString(), NumberStyles.Number, CultureInfo.InvariantCulture, out decimal cashFlow))
+            if (!decimal.TryParse(cashFlowCell.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out decimal cashFlow))
             {
-                logger.LogWarning("Invalid cash flow value at row {Row}: {Value}", row, cashFlowCell.Value);
+                logger.LogWarning("Invalid cash flow value at row {Row}: {Value}", row, cashFlowCell.GetString());
                 continue;
             }
-#pragma warning restore CA1304 // Specify CultureInfo
 
             cashFlows.Add(new ParsedCashFlow(month, cashFlow));
         }

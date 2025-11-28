@@ -20,6 +20,7 @@ public sealed class Organization : Entity
     public string ContactNumber { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
+    public DateOnly? FinancialYearEnd { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

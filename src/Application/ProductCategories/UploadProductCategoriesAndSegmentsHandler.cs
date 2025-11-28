@@ -43,8 +43,15 @@ public sealed class UploadProductCategoriesAndSegmentsHandler(
                     continue;
                 }
 
+                // Validate and parse product category type
+                if (!Enum.TryParse<ProductCategoryType>(row.Type, true, out ProductCategoryType categoryType))
+                {
+                    errors.Add($"Invalid product category type: '{row.Type}'. Valid types are: {string.Join(", ", Enum.GetNames<ProductCategoryType>())}");
+                    continue;
+                }
+
                 // Find or create product category
-                string categoryKey = $"{row.Type}_{row.ProductCategory}";
+                string categoryKey = $"{categoryType}_{row.ProductCategory}";
                 ProductCategory category;
 
                 if (categoryLookup.TryGetValue(categoryKey, out ProductCategory? existingCategory))
@@ -56,7 +63,7 @@ public sealed class UploadProductCategoriesAndSegmentsHandler(
                     category = new ProductCategory
                     {
                         Id = Guid.NewGuid(),
-                        Type = row.Type,
+                        Type = categoryType,
                         Name = row.ProductCategory,
                         CreatedAt = now,
                         UpdatedAt = now

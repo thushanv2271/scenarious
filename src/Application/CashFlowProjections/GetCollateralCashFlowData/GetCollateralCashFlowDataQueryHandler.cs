@@ -2,16 +2,21 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Parsing;
+using Application.CashFlowProjections.Common;
 using Application.FacilityCashFlowTypes.SaveCashFlowType;
 using Domain.FacilityCashFlowTypes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using SharedKernel;
 
 namespace Application.CashFlowProjections.GetCollateralCashFlowData;
 
+/// <summary>
+/// Handler to retrieve collateral value and last quarter cash flow data
+/// Uses repository pattern to separate data access concerns
+/// </summary>
 internal sealed class GetCollateralCashFlowDataQueryHandler(
+    ILoanDetailsRepository loanRepository,
     IApplicationDbContext context,
     IExcelCashFlowParser excelParser,
     ILogger<GetCollateralCashFlowDataQueryHandler> logger)
@@ -28,8 +33,9 @@ internal sealed class GetCollateralCashFlowDataQueryHandler(
     {
         try
         {
-            FacilityCollateralDetail? collateralData = await GetCollateralDataAsync(
-                query.FacilityNumber, cancellationToken);
+            // Step 1: Get collateral data from repository
+            FacilityCollateralDetail? collateralData = await loanRepository
+                .GetFacilityCollateralAsync(query.FacilityNumber, cancellationToken);
 
             if (collateralData == null)
             {
@@ -38,39 +44,15 @@ internal sealed class GetCollateralCashFlowDataQueryHandler(
                         $"Facility {query.FacilityNumber} not found"));
             }
 
-            FacilityCashFlowType? savedConfig = await context.FacilityCashFlowTypes
-                .AsNoTracking()
-                .Where(f => f.FacilityNumber == query.FacilityNumber &&
-                           f.CashFlowType == Domain.FacilityCashFlowTypes.CashFlowsType.CollateralRealization &&
-                           f.IsActive)
-                .FirstOrDefaultAsync(cancellationToken);
+            // Step 2: Get saved haircut percentage or use default
+            decimal haircutPercentage = await GetHaircutPercentageAsync(
+                query.FacilityNumber, cancellationToken);
 
-            decimal haircutPercentage = 0.40m;
-
-            if (savedConfig != null)
-            {
-                try
-                {
-                    CashFlowConfigurationDto? config = JsonSerializer.Deserialize<CashFlowConfigurationDto>(
-                        savedConfig.Configuration,
-                        JsonOptions);
-
-                    if (config?.HaircutPercentage.HasValue == true)
-                    {
-                        haircutPercentage = config.HaircutPercentage.Value;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Failed to parse saved configuration for facility {FacilityNumber}",
-                        query.FacilityNumber);
-                }
-            }
-
+            // Step 3: Get last quarter cash flow data
             LastQuarterCashFlowData? lastQuarterData = await GetLastQuarterCashFlowDataAsync(
-                query.FacilityNumber,
-                cancellationToken);
+                query.FacilityNumber, cancellationToken);
 
+            // Step 4: Build response
             var response = new CollateralCashFlowDataResponse
             {
                 FacilityNumber = collateralData.FacilityNumber,
@@ -86,7 +68,7 @@ internal sealed class GetCollateralCashFlowDataQueryHandler(
             };
 
             logger.LogInformation(
-                "Retrieved collateral data for facility {FacilityNumber}. Collateral Value: {Value}, Haircut: {Haircut}%",
+                "Retrieved collateral data for facility {FacilityNumber}. Value: {Value}, Haircut: {Haircut}%",
                 query.FacilityNumber, collateralData.CollateralValue, haircutPercentage * 100);
 
             return Result.Success(response);
@@ -102,61 +84,55 @@ internal sealed class GetCollateralCashFlowDataQueryHandler(
         }
     }
 
-    private async Task<FacilityCollateralDetail?> GetCollateralDataAsync(
+    /// <summary>
+    /// Gets configured haircut percentage or returns default
+    /// </summary>
+    private async Task<decimal> GetHaircutPercentageAsync(
         string facilityNumber,
         CancellationToken cancellationToken)
     {
-        var dbContext = context as DbContext;
-        string? connectionString = dbContext?.Database.GetConnectionString();
+        FacilityCashFlowType? savedConfig = await context.FacilityCashFlowTypes
+            .AsNoTracking()
+            .Where(f => f.FacilityNumber == facilityNumber &&
+                       f.CashFlowType == CashFlowsType.CollateralRealization &&
+                       f.IsActive)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (string.IsNullOrEmpty(connectionString))
+        if (savedConfig == null)
         {
-            return null;
+            return CashFlowConstants.DefaultHaircutPercentage;
         }
 
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-
-        string sql = @"
-            SELECT 
-                customer_number,
-                facility_number,
-                collateral_type,
-                collateral_value
-            FROM loan_details
-            WHERE facility_number = @facilityNumber
-            ORDER BY period DESC
-            LIMIT 1";
-
-        await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@facilityNumber", facilityNumber);
-
-        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-
-        if (await reader.ReadAsync(cancellationToken))
+        try
         {
-            return new FacilityCollateralDetail
-            {
-                CustomerNumber = reader.GetString(0),
-                FacilityNumber = reader.GetString(1),
-                CollateralType = reader.GetString(2),
-                CollateralValue = reader.GetDecimal(3)
-            };
-        }
+            CashFlowConfigurationDto? config = JsonSerializer.Deserialize<CashFlowConfigurationDto>(
+                savedConfig.Configuration, JsonOptions);
 
-        return null;
+            return config?.HaircutPercentage ?? CashFlowConstants.DefaultHaircutPercentage;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Failed to parse saved configuration for facility {FacilityNumber}, using default haircut",
+                facilityNumber);
+            return CashFlowConstants.DefaultHaircutPercentage;
+        }
     }
 
+    /// <summary>
+    /// Gets last quarter cash flow data from uploaded files
+    /// </summary>
     private async Task<LastQuarterCashFlowData?> GetLastQuarterCashFlowDataAsync(
         string facilityNumber,
         CancellationToken cancellationToken)
     {
+        // Single query with navigation properties to avoid N+1
         var uploadedFileInfo = await (
             from fcf in context.FacilityCashFlowTypes
             join scenario in context.Scenarios on fcf.ScenarioId equals scenario.Id
             join file in context.UploadedFiles on scenario.UploadedFileId equals file.Id
             where fcf.FacilityNumber == facilityNumber
-                  && fcf.CashFlowType == Domain.FacilityCashFlowTypes.CashFlowsType.LastQuarterCashFlows
+                  && fcf.CashFlowType == CashFlowsType.LastQuarterCashFlows
                   && fcf.IsActive
             orderby file.UploadedAt descending
             select new
@@ -173,9 +149,9 @@ internal sealed class GetCollateralCashFlowDataQueryHandler(
             return null;
         }
 
+        // Parse cash flows from Excel file
         Result<List<ParsedCashFlow>> parseResult = await excelParser.ParseCashFlowsAsync(
-            uploadedFileInfo.PhysicalPath,
-            cancellationToken);
+            uploadedFileInfo.PhysicalPath, cancellationToken);
 
         if (parseResult.IsFailure)
         {
@@ -203,6 +179,4 @@ internal sealed class GetCollateralCashFlowDataQueryHandler(
             }).ToList()
         };
     }
-
-
 }
