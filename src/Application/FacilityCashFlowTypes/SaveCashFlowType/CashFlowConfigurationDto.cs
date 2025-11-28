@@ -1,13 +1,16 @@
-﻿namespace Application.FacilityCashFlowTypes.SaveCashFlowType;
+﻿using Domain.FacilityCashFlowTypes;
+
+namespace Application.FacilityCashFlowTypes.SaveCashFlowType;
+
 /// <summary>
 /// Configuration data transfer object for cash flow type settings
 /// </summary>
 public sealed record CashFlowConfigurationDto
 {
     /// <summary>
-    /// Payment frequency for contract modifications (Monthly, Quarterly, Annually)
+    /// Payment frequency for contract modifications
     /// </summary>
-    public string? Frequency { get; init; }
+    public PaymentFrequency? Frequency { get; init; }
 
     /// <summary>
     /// Payment value for contract modifications
@@ -44,4 +47,3 @@ public sealed record CashFlowConfigurationDto
     /// </summary>
     public List<CustomCashFlowDto>? CustomCashFlows { get; init; }
 }
-
