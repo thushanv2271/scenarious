@@ -5,6 +5,7 @@ using Application.Abstractions.Configuration;
 using Application.Abstractions.Data;
 using Application.Abstractions.Exporting;
 using Application.Abstractions.Parsing;
+using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Application.FacilityCashFlowTypes.SaveCashFlowType.Validators;
 using Application.ProductCategories;
@@ -52,6 +53,7 @@ public static class DependencyInjection
         var appConfiguration = new AppConfiguration(configuration);
         services.AddSingleton<IAppConfiguration>(appConfiguration);
 
+
         if (appConfiguration.HostingType == "Cloud")
         {
             // Azure Blob (example)
@@ -84,6 +86,9 @@ public static class DependencyInjection
         services.AddScoped<ILoanDetailsRepository, LoanDetailsRepository>();
         services.AddScoped<ICashFlowCalculationService, CashFlowCalculationService>();
         services.AddScoped<ICashFlowConfigurationValidator, CashFlowConfigurationValidator>();
+
+        // Register Cash Flow Discounting Service
+        services.AddScoped<ICashFlowDiscountingService, CashFlowDiscountingService>();
 
         return services;
     }
