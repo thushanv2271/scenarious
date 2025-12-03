@@ -17,6 +17,8 @@ public sealed class IndividualImpairmentCalculation
     public Guid CalculatedBy { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    private IndividualImpairmentCalculation() { } // EF Core constructor
+
     public static IndividualImpairmentCalculation Create(
         string facilityNumber,
         string customerNumber,

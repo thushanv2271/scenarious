@@ -8,6 +8,7 @@ using Application.Abstractions.Parsing;
 using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Application.FacilityCashFlowTypes.SaveCashFlowType.Validators;
+using Application.IndividualImpairment.Services;
 using Application.ProductCategories;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
@@ -89,6 +90,8 @@ public static class DependencyInjection
 
         // Register Cash Flow Discounting Service
         services.AddScoped<ICashFlowDiscountingService, CashFlowDiscountingService>();
+        services.AddScoped<ICashFlowOrchestrationService, CashFlowOrchestrationService>();
+
 
         return services;
     }

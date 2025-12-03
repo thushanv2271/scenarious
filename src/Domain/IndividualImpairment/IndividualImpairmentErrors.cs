@@ -39,4 +39,8 @@ public static class IndividualImpairmentErrors
     public static Error FacilityNotFound(string facilityNumber) => Error.NotFound(
         "IndividualImpairment.FacilityNotFound",
         $"Facility with number '{facilityNumber}' was not found");
+
+    public static Error NoFacilitiesProvided => Error.Validation(
+        "IndividualImpairment.NoFacilitiesProvided",
+        "At least one facility must be provided");
 }

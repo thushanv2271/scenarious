@@ -1,16 +1,18 @@
 ﻿using System.Collections.Generic;
 using Domain.Authentication;
 using Domain.Branches;
+using Domain.CollectiveImpairment;
 using Domain.Configurations;
 using Domain.EfaConfigs;
 using Domain.Exports;
 using Domain.FacilityCashFlowTypes;
 using Domain.Files;
-using Domain.CollectiveImpairment;
+using Domain.IndividualImpairment;
 using Domain.Industries;
 using Domain.MasterData;
 using Domain.Organizations;
 using Domain.PasswordResetTokens;
+using Domain.PDCalculation;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
@@ -25,7 +27,6 @@ using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using SharedKernel;
-using Domain.PDCalculation;
 
 namespace Application.Abstractions.Data;
 
@@ -74,6 +75,8 @@ public interface IApplicationDbContext
 
     DbSet<AgeBucketConfiguration> AgeBucketConfigurations { get; }
     
+    DbSet<IndividualImpairmentCalculation> IndividualImpairmentCalculations { get; }
+
     DatabaseFacade Database { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

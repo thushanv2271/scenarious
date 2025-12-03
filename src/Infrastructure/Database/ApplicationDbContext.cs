@@ -2,16 +2,18 @@
 using Application.Abstractions.Data;
 using Domain.Authentication;
 using Domain.Branches;
+using Domain.CollectiveImpairment;
 using Domain.Configurations;
 using Domain.EfaConfigs;
 using Domain.Exports;
 using Domain.FacilityCashFlowTypes;
 using Domain.Files;
-using Domain.CollectiveImpairment;
+using Domain.IndividualImpairment;
 using Domain.Industries;
 using Domain.MasterData;
 using Domain.Organizations;
 using Domain.PasswordResetTokens;
+using Domain.PDCalculation;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
@@ -26,7 +28,6 @@ using Domain.Users;
 using Infrastructure.DomainEvents;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
-using Domain.PDCalculation;
 
 namespace Infrastructure.Database;
 
@@ -78,6 +79,7 @@ public sealed class ApplicationDbContext(
 
     public DbSet<AgeBucketConfiguration> AgeBucketConfigurations { get; set; } = null!;
 
+        public DbSet<IndividualImpairmentCalculation> IndividualImpairmentCalculations { get; set; }
 
     public DbSet<FacilityCashFlowType> FacilityCashFlowTypes { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
