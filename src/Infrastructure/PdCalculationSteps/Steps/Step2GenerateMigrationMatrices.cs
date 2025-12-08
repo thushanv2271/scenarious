@@ -24,7 +24,9 @@ public class Step2GenerateMigrationMatrices
     private readonly TimeConfig _timeConfig;
     private readonly List<DatePassedDueBucket> _datePassedDueBuckets;
     private readonly List<PDConfiguration> _pdConfiguration;
-
+    private List<string> _distinctPeriods;
+    private List<string> _smallPortfolioPeriods;
+    private string _periodNBackup = string.Empty;
     public Step2GenerateMigrationMatrices(
         IApplicationDbContext dbContext,
         IPDSetupConfigurationService pdSetupConfigurationService,
@@ -134,7 +136,9 @@ public class Step2GenerateMigrationMatrices
                 .Select(ld => ld.Period)
                 .Distinct()
                 .OrderBy(p => p)
-                .ToList(); 
+                .ToList();
+
+            _distinctPeriods = distinctPeriods;
 
             if (distinctPeriods.Count < 2)
             {
@@ -350,6 +354,55 @@ public class Step2GenerateMigrationMatrices
             }
             else
             {
+                #region Smaller Time Frame Portfolio Sheet Comparison
+                if (_timeConfig.Frequency.Equals("monthly", StringComparison.OrdinalIgnoreCase) 
+                    && (segmentConfig.ADS1 || segmentConfig.ADS2)
+                    && (segmentConfig.ComparisonPeriod.Equals("yearly", StringComparison.OrdinalIgnoreCase)
+                    || segmentConfig.ComparisonPeriod.Equals("quarterly", StringComparison.OrdinalIgnoreCase))
+                    && _smallPortfolioPeriods is not null 
+                    && _smallPortfolioPeriods.Count > 0)
+                {
+                    bool existsInSmallPortfolio = false;
+
+                    // Use the existing lookup directly with NO ToList() and NO SelectMany
+                    foreach (string sp in _smallPortfolioPeriods)
+                    {
+                        if (!lookup.TryGetValue((sp, segmentConfig.ProductCategory, segmentConfig.Segment),
+                                out List<LoanDetailSlim>? loansInSP))
+                        {
+                            continue;
+                        }
+
+                        // Direct check inside the list - MUCH faster and no allocations
+                        if (loansInSP.Any(ld =>
+                                ld.CustomerNumber == loanNMinus1.CustomerNumber &&
+                                ld.FacilityNumber == loanNMinus1.FacilityNumber &&
+                                ld.FinalBucket == worstBucket))
+                        {
+                            existsInSmallPortfolio = true;
+                            break;
+                        }
+                    }
+
+
+                    if (existsInSmallPortfolio)
+                    {
+                        PdMigrationRowDto migrationRowNew = new()
+                        {
+                            CustomerId = loanNMinus1.CustomerNumber,
+                            FacilityId = loanNMinus1.FacilityNumber,
+                            ProductCategory = loanNMinus1.ProductCategory,
+                            Segment = loanNMinus1.Segment,
+                            BucketStatusNMinus1 = loanNMinus1.FinalBucket,
+                            BucketStatusN = loanNFinalBucket,
+                            FinalizedBucketStatus = worstBucket
+                        };
+                        migrationRows.Add(migrationRowNew);
+                        continue;
+                    }
+                }
+                #endregion
+
                 string loanNFinalBucketFixed = string.IsNullOrEmpty(loanNFinalBucket) ? "N/A" : loanNFinalBucket;
                 PdMigrationRowDto migrationRow = new()
                 {
@@ -371,6 +424,70 @@ public class Step2GenerateMigrationMatrices
 
         return migrationRows;
     }
+
+    /// <summary>
+/// Gets the list of periods between periodNMinus1 and periodN (inclusive) for small portfolio analysis.
+/// </summary>
+/// <param name="periodN">The current period (N)</param>
+/// <param name="periodNMinus1">The comparison period (N-1)</param>
+/// <returns>List of period strings between the two periods</returns>
+private List<string> GetSmallPortfolioPeriodsList(string periodN, string periodNMinus1)
+{
+    try
+    {
+        _logger.LogDebug("Getting periods between {PeriodNMinus1} and {PeriodN} for small portfolio analysis",
+            periodNMinus1, periodN);
+
+        List<string> allPeriods = _distinctPeriods;
+
+        if (allPeriods.Count == 0)
+        {
+            _logger.LogWarning("No periods found in loan details");
+            return new List<string>();
+        }
+
+        // Find the indices of the start and end periods
+        int startIndex = allPeriods.IndexOf(periodNMinus1);
+        int endIndex = allPeriods.IndexOf(periodN);
+
+        // Validate that both periods exist
+        if (startIndex < 0)
+        {
+            _logger.LogWarning("Period {PeriodNMinus1} not found in available periods", periodNMinus1);
+            return new List<string>();
+        }
+
+        if (endIndex < 0)
+        {
+            _logger.LogWarning("Period {PeriodN} not found in available periods", periodN);
+            return new List<string>();
+        }
+
+        // Ensure correct order (startIndex should be before endIndex)
+        if (startIndex > endIndex)
+        {
+            _logger.LogWarning("Period {PeriodNMinus1} is after {PeriodN}, which is invalid",
+                periodNMinus1, periodN);
+            return new List<string>();
+        }
+
+        // Get the periods between (exclusive)
+        var periodsBetween = allPeriods
+            .Where((p, index) => index > startIndex && index < endIndex)
+            .ToList();
+
+        _logger.LogInformation("Found {Count} periods between {PeriodNMinus1} and {PeriodN}: {Periods}",
+        periodsBetween.Count, periodNMinus1, periodN, string.Join(", ", periodsBetween));
+
+        return periodsBetween;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error occurred while getting small portfolio periods list: {ErrorMessage}", 
+            ex.Message);
+        return new List<string>();
+    }
+}
 
     /// <summary>
     /// Generates segment-wise migration matrices from PD datasets with both counts and percentages.
@@ -639,6 +756,17 @@ public class Step2GenerateMigrationMatrices
                         segmentConfig.Segment, productCategoryName, segmentConfig.ComparisonPeriod);
                     continue;
                 }
+
+                if (_timeConfig.Frequency.Equals("monthly", StringComparison.OrdinalIgnoreCase)
+                    && (segmentConfig.ADS1 || segmentConfig.ADS2)
+                    && _periodNBackup != periodN
+                    && (segmentConfig.ComparisonPeriod.Equals("yearly", StringComparison.OrdinalIgnoreCase)
+                    || segmentConfig.ComparisonPeriod.Equals("quarterly", StringComparison.OrdinalIgnoreCase)))
+                {
+                    _smallPortfolioPeriods = GetSmallPortfolioPeriodsList(periodN, adjustedPeriodNMinus1);
+                    _periodNBackup = periodN;
+                }
+                    
 
                 // Create migration rows for this specific segment and product category combination
                 List<PdMigrationRowDto> migrationRows = CreateMigrationRowsForSegment(

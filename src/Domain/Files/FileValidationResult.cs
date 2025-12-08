@@ -16,6 +16,8 @@ public sealed class FileValidationResult : Entity
     public int TotalErrors { get; init; }
     
     public required string Status { get; init; }
+
+    public Guid SessionId { get; init; }
     
     public DateTime CreatedOnUtc { get; init; } = DateTime.UtcNow;
     

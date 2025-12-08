@@ -1,8 +1,11 @@
-﻿using System.Text.Json;
+﻿using System.Security.Claims;
+using System.Text.Json;
 using Application.Abstractions.Calculations;
+using Application.Abstractions.Data;
 using Application.DTOs.PD;
 using Application.Models;
 using Application.Models.PDSummary;
+using Domain.PDAlgorithmResults;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using Web.Api.Infrastructure;
@@ -18,9 +21,15 @@ namespace Web.Api.Endpoints.PdCalculation.ExecutePdCalculationPipeline;
 /// </summary>
 internal sealed class Endpoint : IEndpoint
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private static readonly JsonSerializerOptions JsonDeserializeOptions = new()
     {
         PropertyNameCaseInsensitive = true
+    };
+
+    private static readonly JsonSerializerOptions JsonSerializeOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false
     };
 
     public void MapEndpoint(IEndpointRouteBuilder app)
@@ -28,6 +37,7 @@ internal sealed class Endpoint : IEndpoint
         app.MapPost("pd-calculations/pipeline", async (
             Request request,
             IPDCalculationService pdCalculationService,
+            IApplicationDbContext dbContext,
             ILogger<Endpoint> logger,
             CancellationToken cancellationToken,
             HttpContext context) =>
@@ -38,6 +48,14 @@ internal sealed class Endpoint : IEndpoint
             {
                 // Get user from context
                 string createdBy = context.User?.Identity?.Name ?? "system";
+
+                // Get user ID from claims
+                var createdByUserId = Guid.Parse("00000000-0000-0000-0000-000000000001"); // Default
+                Claim? userIdClaim = context.User?.FindFirst("sub") ?? context.User?.FindFirst("userId");
+                if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out Guid parsedUserId))
+                {
+                    createdByUserId = parsedUserId;
+                }
 
                 #region Step 1 - Data Preparation
 
@@ -97,7 +115,7 @@ internal sealed class Endpoint : IEndpoint
 
                 #region Step 4 - Extrapolation
 
-                AveragePDTablesResponse? step3Data = JsonSerializer.Deserialize<AveragePDTablesResponse>(step3Result.Value, JsonOptions);
+                AveragePDTablesResponse? step3Data = JsonSerializer.Deserialize<AveragePDTablesResponse>(step3Result.Value, JsonDeserializeOptions);
 
                 Result<PdExtrapolationResultDto> step4Result = await pdCalculationService.ExecuteStep4Async(
                     step3Data,
@@ -114,6 +132,36 @@ internal sealed class Endpoint : IEndpoint
 
                 #endregion
 
+                #region Save PD Algorithm Result to Database
+
+                try
+                {
+                    // Serialize step4 result to JSON for JSONB storage
+                    string pdAlgorithmJson = JsonSerializer.Serialize(step4Result.Value, JsonSerializeOptions);
+
+                    // Create the PD Algorithm Result entity
+                    var pdAlgorithmResult = PDAlgorithmResult.Create(
+                        pdAlgorithmJson,
+                        createdByUserId
+                    );
+
+                    // Save to database
+                    dbContext.PDAlgorithmResults.Add(pdAlgorithmResult);
+                    await dbContext.SaveChangesAsync(cancellationToken);
+
+                    logger.LogInformation(
+                        "PD Algorithm Result saved to database. ID: {Id}, ProductCategories: {Count}",
+                        pdAlgorithmResult.Id,
+                        step4Result.Value.ProductCategories.Count);
+                }
+                catch (Exception saveEx)
+                {
+                    logger.LogError(saveEx, "Failed to save PD Algorithm Result to database: {ErrorMessage}", saveEx.Message);
+                    // Continue execution - still return the calculated result
+                }
+
+                #endregion
+
                 logger.LogInformation("✅ PD Calculation Pipeline completed successfully. All 4 steps executed without error.");
 
                 return Results.Ok(step4Result.Value);
@@ -124,7 +172,7 @@ internal sealed class Endpoint : IEndpoint
                 return Results.Problem(new ProblemDetails
                 {
                     Title = "PD Calculation Pipeline Execution Failed",
-                    Detail = "An error occurred while executing the PD Calculation pipeline. Please check the logs for more details.",
+                    Detail = $"An error occurred while executing the PD Calculation pipeline: {ex.Message}",
                     Status = 500,
                     Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1"
                 });
@@ -133,7 +181,7 @@ internal sealed class Endpoint : IEndpoint
         .WithTags("PD Calculation")
         .WithName("ExecutePdCalculationPipeline")
         .WithSummary("Execute PD Calculation Pipeline")
-        .WithDescription("Executes the full PD Calculation pipeline, running all four steps: data extraction, merging, interpolation, and extrapolation.")
+        .WithDescription("Executes the full PD Calculation pipeline, running all four steps: data extraction, merging, interpolation, and extrapolation. Results are saved to pd_algorithm_results table.")
         .Produces<PdExtrapolationResultDto>(200)
         .ProducesProblem(400)
         .ProducesProblem(500);

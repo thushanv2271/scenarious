@@ -4,8 +4,6 @@ using SharedKernel;
 namespace Application.Configurations.AgeBucket.Get;
 
 /// <summary>
-/// Query to get age bucket configurations with pagination
+/// Query to get the single age bucket configuration (no pagination)
 /// </summary>
-public sealed record GetAgeBucketConfigurationsQuery(
-    int Page = 1,
-    int PageSize = 10) : IQuery<PaginatedResult<AgeBucketConfigurationDto>>;
+public sealed record GetAgeBucketConfigurationQuery() : IQuery<AgeBucketConfigurationDto>;

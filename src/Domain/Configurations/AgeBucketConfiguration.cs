@@ -15,7 +15,7 @@ public class AgeBucketConfiguration : Entity
 /// </summary>
 public sealed class AgeBucketConfigurationData
 {
-    public ICollection<DatePassedDueBasedConfiguration> DatePassedDueBasedConfigurations { get; set; } = [];
-    public ICollection<ReschedulesAndRestructuredBasedConfiguration> ReschedulesAndRestructuredBasedConfigurations { get; set; } = [];
-    public ICollection<IndustryBasedConfiguration> IndustryBasedConfigurations { get; set; } = [];
+    public ICollection<DatePassedDueBasedConfiguration>? DatePassedDueBasedConfigurations { get; set; } = [];
+    public ICollection<ReschedulesAndRestructuredBasedConfiguration>? ReschedulesAndRestructuredBasedConfigurations { get; set; } = [];
+    public ICollection<IndustryBasedConfiguration>? IndustryBasedConfigurations { get; set; } = [];
 }

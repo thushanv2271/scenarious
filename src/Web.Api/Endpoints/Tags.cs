@@ -11,5 +11,5 @@ public static class Tags
     public const string CollectiveImpairment = "Collective Impairment";
     public const string CashFlowTypes = "Cash Flow Types";
     public const string CashFlowProjections = "Cash Flow Projections";
-    public const string IndividualImpairment = "Individual Impairment";
+    public const string PDAlgorithmResults = "PD Algorithm Results";
 }

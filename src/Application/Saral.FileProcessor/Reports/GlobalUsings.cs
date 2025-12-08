@@ -1,0 +1,12 @@
+global using System.Collections.Immutable;
+global using System.Globalization;
+global using System.Text;
+global using System.Text.Json;
+global using System.Text.Json.Serialization;
+global using System.Text.RegularExpressions;
+global using ClosedXML.Excel;
+global using Saral.FileProcessor.Core.Models;
+global using Saral.FileProcessor.Core.Utilities;
+global using Saral.FileProcessor.Reports.Abstractions;
+global using Saral.FileProcessor.Reports.Models;
+global using Saral.FileProcessor.Reports.Writers;

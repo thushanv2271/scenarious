@@ -22,11 +22,36 @@ public sealed record FinalBucketPayload
     /// <returns>True if valid, false otherwise</returns>
     public bool IsValid()
     {
-        return Type switch
+        if(Type == null)
         {
-            "worst" => true,
-            "percentage" => Percentage.HasValue && Percentage.Value > 0 && Percentage.Value <= 100,
-            _ => false
-        };
+            return false;
+        }
+
+        string type = Type.Trim();
+
+        if (type.Equals(FinalBucketTypes.Worst, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (type.Equals(FinalBucketTypes.Percentage, StringComparison.OrdinalIgnoreCase))
+        {
+            return Percentage is > 0 and <= 100;
+        }
+
+        if (type.Equals(FinalBucketTypes.None, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 }
+
+public static class FinalBucketTypes
+{
+    public const string Worst = "WORST";
+    public const string Percentage = "PERCENTAGE";
+    public const string None = "NONE";
+}
+

@@ -26,7 +26,12 @@ internal sealed class Create : IEndpoint
                     s.OtherCashFlowsEnabled,
                     s.CollateralValueEnabled,
                     s.UploadFile != null ? new UploadFileItem(
-                        s.UploadFile.Id
+                        s.UploadFile.OriginalFileName,
+                        s.UploadFile.StoredFileName,
+                        s.UploadFile.ContentType,
+                        s.UploadFile.Size,
+                        s.UploadFile.Url,  // No need for new Uri() anymore
+                        s.UploadFile.UploadedBy
                     ) : null
                 ))]
             );

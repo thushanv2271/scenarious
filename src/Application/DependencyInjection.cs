@@ -1,8 +1,9 @@
 ﻿using Application.Abstractions.Behaviors;
 using Application.Abstractions.Messaging;
+using Application.Files.Services;
 using Application.Services;
 using FluentValidation;
-using Microsoft.Extensions.DependencyInjection;
+using Saral.FileProcessor.Reports.Services;
 using SharedKernel;
 
 namespace Application;
@@ -40,6 +41,18 @@ public static class DependencyInjection
         // Register specific handlers
         services.AddScoped<ProductCategories.UploadProductCategoriesAndSegmentsHandler>();
         services.AddScoped<ProductCategories.SearchProductCategoriesAndSegmentsHandler>();
+
+        // Register file movement service
+        services.AddScoped<IFileMovementService, FileMovementService>();
+
+        // Saral.FileProcessor Core services
+        services.AddScoped<Saral.FileProcessor.Core.Services.IFileProcessingService, Saral.FileProcessor.Core.Services.FileProcessingService>();
+
+        // Saral.FileProcessor Data services
+        services.AddScoped<Saral.FileProcessor.Data.Services.IFileProcessingResultService, Saral.FileProcessor.Data.Services.FileProcessingResultService>();
+
+        // Saral.FileProcessor Reports services
+        services.AddScoped<Saral.FileProcessor.Reports.Services.IReportGenerationService, Saral.FileProcessor.Reports.Services.ReportGenerationService>();
 
         return services;
     }

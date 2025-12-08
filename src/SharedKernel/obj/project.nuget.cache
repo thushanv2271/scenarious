@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "KaMEBXTEzYw=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\ThushanVithana\\Desktop\\PDAlgorithmResult\\src\\SharedKernel\\SharedKernel.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\ThushanVithana\\.nuget\\packages\\sonaranalyzer.csharp\\10.15.0.120848\\sonaranalyzer.csharp.10.15.0.120848.nupkg.sha512"
+  ],
+  "logs": []
+}

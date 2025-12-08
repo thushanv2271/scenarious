@@ -362,6 +362,10 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -435,84 +439,6 @@ namespace Infrastructure.Database.Migrations
                         .HasName("pk_uploaded_files");
 
                     b.ToTable("UploadedFiles", "public");
-                });
-
-            modelBuilder.Entity("Domain.IndividualImpairment.IndividualImpairmentCalculation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<decimal>("AmortizedCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("amortized_cost");
-
-                    b.Property<Guid>("CalculatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("calculated_by");
-
-                    b.Property<DateTime>("CalculationDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("calculation_date");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("CustomerNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("customer_number");
-
-                    b.Property<string>("FacilityNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("facility_number");
-
-                    b.Property<decimal>("ImpairmentAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("impairment_amount");
-
-                    b.Property<decimal>("ImpairmentPercentage")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("impairment_percentage");
-
-                    b.Property<decimal>("InterestRate")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)")
-                        .HasColumnName("interest_rate");
-
-                    b.Property<string>("ScenarioDetailsJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("scenario_details_json");
-
-                    b.Property<decimal>("SumOfPVOfCashFlows")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("sum_of_pv_of_cash_flows");
-
-                    b.HasKey("Id")
-                        .HasName("pk_individual_impairment_calculations");
-
-                    b.HasIndex("CalculationDate")
-                        .HasDatabaseName("ix_individual_impairment_calculations_calculation_date");
-
-                    b.HasIndex("CustomerNumber")
-                        .HasDatabaseName("ix_individual_impairment_calculations_customer_number");
-
-                    b.HasIndex("FacilityNumber")
-                        .HasDatabaseName("ix_individual_impairment_calculations_facility_number");
-
-                    b.HasIndex("CustomerNumber", "CalculationDate")
-                        .HasDatabaseName("ix_individual_impairment_calculations_customer_date");
-
-                    b.ToTable("individual_impairment_calculations", "public");
                 });
 
             modelBuilder.Entity("Domain.Industries.Industry", b =>
@@ -647,6 +573,45 @@ namespace Infrastructure.Database.Migrations
                         .HasDatabaseName("IX_Organizations_IsActive");
 
                     b.ToTable("organizations", "public");
+                });
+
+            modelBuilder.Entity("Domain.PDAlgorithmResults.PDAlgorithmResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("PdAlgorithmResultData")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("pd_algorithm_result_data");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pd_algorithm_results");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_pd_algorithm_results_created_at");
+
+                    b.ToTable("pd_algorithm_results", "public");
                 });
 
             modelBuilder.Entity("Domain.PDCalculation.FileDetails", b =>

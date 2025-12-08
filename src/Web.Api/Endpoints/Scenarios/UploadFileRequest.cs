@@ -1,6 +1,10 @@
 ﻿namespace Web.Api.Endpoints.Scenarios;
 
 public sealed record UploadFileRequest(
-    Guid Id
-
+    string OriginalFileName,
+    string StoredFileName,
+    string ContentType,
+    long Size,
+    Uri Url,
+    Guid UploadedBy
 );

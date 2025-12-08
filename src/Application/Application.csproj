@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    
+    <PackageReference Include="ClosedXML" />
+    <PackageReference Include="Deedle" />
     <PackageReference Include="EPPlus" />
     
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />

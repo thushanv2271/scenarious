@@ -56,7 +56,7 @@ internal static class ValidationDecorator
 
         var context = new ValidationContext<TCommand>(command);
 
-        ValidationResult[] validationResults = await Task.WhenAll(
+        FluentValidation.Results.ValidationResult[] validationResults = await Task.WhenAll(
             validators.Select(validator => validator.ValidateAsync(context)));
 
         ValidationFailure[] validationFailures = validationResults

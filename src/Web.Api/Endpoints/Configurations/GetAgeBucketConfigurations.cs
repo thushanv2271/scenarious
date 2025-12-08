@@ -11,24 +11,22 @@ internal sealed class GetAgeBucketConfigurations : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("/configurations/age-bucket", async (
-            int page,
-            int pageSize,
-            IQueryHandler<GetAgeBucketConfigurationsQuery, PaginatedResult<AgeBucketConfigurationDto>> handler,
+            IQueryHandler<GetAgeBucketConfigurationQuery, AgeBucketConfigurationDto> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetAgeBucketConfigurationsQuery(page, pageSize);
-            Result<PaginatedResult<AgeBucketConfigurationDto>> result = await handler.Handle(query, cancellationToken);
+            var query = new GetAgeBucketConfigurationQuery();
+            Result<AgeBucketConfigurationDto> result = await handler.Handle(query, cancellationToken);
 
             return result.Match(
                 success => Results.Ok(success),
                 CustomResults.Problem);
         })
         .RequireAuthorization()
-        .WithName("GetAgeBucketConfigurations")
-        .WithSummary("Get age bucket configurations with pagination")
-        .WithDescription("Returns a paginated list of age bucket configurations")
+        .WithName("GetAgeBucketConfiguration")
+        .WithSummary("Get age bucket configuration")
+        .WithDescription("Returns the single age bucket configuration")
         .WithTags("Configurations")
-        .Produces<PaginatedResult<AgeBucketConfigurationDto>>(200)
+        .Produces<AgeBucketConfigurationDto>(200)
         .ProducesProblem(400)
         .ProducesProblem(401);
     }

@@ -24,12 +24,12 @@ public static class FinalBucketCalculationHelper
         if (!finalBucketPayload.IsValid() || !loanDetails.Any())
         {
             // Set all to their original bucket if no payload or no data
-            foreach (LoanDetails loan in loanDetails)
-            {
-                finalBuckets[loan.Id] = loan.BucketLabel;
-            }
+            ApplyOriginalBuckets(loanDetails, finalBuckets);
             return finalBuckets;
         }
+
+        // Normalize the type ONCE
+        string type = finalBucketPayload.Type?.Trim() ?? string.Empty;
 
         // Group by customer number and period
         IEnumerable<IGrouping<string, LoanDetails>> customerPeriodGroups = loanDetails
@@ -39,26 +39,42 @@ public static class FinalBucketCalculationHelper
         {
             var customerLoans = customerPeriodGroup.ToList();
 
-            if (finalBucketPayload.Type.Equals("worst", StringComparison.OrdinalIgnoreCase))
+            if (type.Equals(FinalBucketTypes.Worst, StringComparison.OrdinalIgnoreCase))
             {
                 CalculateWorstBucket(customerLoans, finalBuckets);
             }
-            else if (finalBucketPayload.Type.Equals("percentage", StringComparison.OrdinalIgnoreCase) && finalBucketPayload.Percentage.HasValue)
+            else if (type.Equals(FinalBucketTypes.Percentage, StringComparison.OrdinalIgnoreCase)
+                     && finalBucketPayload.Percentage.HasValue)
             {
                 CalculatePercentageBucket(customerLoans, (double)finalBucketPayload.Percentage.Value, finalBuckets);
             }
+            else if (type.Equals(FinalBucketTypes.None, StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyOriginalBuckets(customerLoans, finalBuckets);
+            }
             else
             {
-                // Default to original bucket if payload is invalid
-                foreach (LoanDetails? loan in customerLoans)
-                {
-                    finalBuckets[loan.Id] = loan.BucketLabel;
-                    loan.FinalBucket = loan.BucketLabel; // Update the entity property
-                }
+                ApplyOriginalBuckets(customerLoans, finalBuckets);
             }
+
         }
 
         return finalBuckets;
+    }
+
+    /// <summary>
+    /// Moves all loans to their original bucket.
+    /// Used for NONE, invalid cases, and fallbacks.
+    /// </summary>
+    private static void ApplyOriginalBuckets(
+        IEnumerable<LoanDetails> loans,
+        Dictionary<Guid, string> finalBuckets)
+    {
+        foreach (LoanDetails loan in loans)
+        {
+            finalBuckets[loan.Id] = loan.BucketLabel;
+            loan.FinalBucket = loan.BucketLabel;
+        }
     }
 
     /// <summary>

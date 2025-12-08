@@ -7,11 +7,11 @@ using Domain.EfaConfigs;
 using Domain.Exports;
 using Domain.FacilityCashFlowTypes;
 using Domain.Files;
-using Domain.IndividualImpairment;
 using Domain.Industries;
 using Domain.MasterData;
 using Domain.Organizations;
 using Domain.PasswordResetTokens;
+using Domain.PDAlgorithmResults;
 using Domain.PDCalculation;
 using Domain.PDTempData;
 using Domain.Permissions;
@@ -74,8 +74,8 @@ public interface IApplicationDbContext
     DbSet<CustomerRiskIndicatorEvaluation> CustomerRiskIndicatorEvaluations { get; }
 
     DbSet<AgeBucketConfiguration> AgeBucketConfigurations { get; }
-    
-    DbSet<IndividualImpairmentCalculation> IndividualImpairmentCalculations { get; }
+
+    DbSet<PDAlgorithmResult> PDAlgorithmResults { get; }
 
     DatabaseFacade Database { get; }
 

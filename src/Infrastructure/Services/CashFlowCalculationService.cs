@@ -8,7 +8,7 @@ namespace Infrastructure.Services;
 /// <summary>
 /// Implementation of cash flow calculation service
 /// Handles EMI, bullet payment, and equal principal calculations
-/// </summary>  
+/// </summary>
 internal sealed class CashFlowCalculationService : ICashFlowCalculationService
 {
     private readonly ILogger<CashFlowCalculationService> _logger;

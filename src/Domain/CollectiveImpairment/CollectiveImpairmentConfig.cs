@@ -2,7 +2,7 @@ namespace Domain.CollectiveImpairment;
 
 public sealed class CollectiveImpairmentConfig
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; } = Guid.CreateVersion7();
     public ParameterType Parameter { get; set; }
     public string ConfigJson { get; set; } = string.Empty;
     public Guid CreatedBy { get; set; }

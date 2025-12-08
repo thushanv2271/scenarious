@@ -1,0 +1,9 @@
+global using System.Collections.Immutable;
+global using System.Linq;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.DependencyInjection;
+global using Domain.Files;
+global using Saral.FileProcessor.Core.Models;
+global using Saral.FileProcessor.Core.Services;
+global using Saral.FileProcessor.Data.Context;
+global using Saral.FileProcessor.Data.Services;

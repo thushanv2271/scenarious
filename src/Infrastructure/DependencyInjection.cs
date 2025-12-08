@@ -5,10 +5,8 @@ using Application.Abstractions.Configuration;
 using Application.Abstractions.Data;
 using Application.Abstractions.Exporting;
 using Application.Abstractions.Parsing;
-using Application.Abstractions.Services;
 using Application.Abstractions.Storage;
 using Application.FacilityCashFlowTypes.SaveCashFlowType.Validators;
-using Application.IndividualImpairment.Services;
 using Application.ProductCategories;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
@@ -54,7 +52,6 @@ public static class DependencyInjection
         var appConfiguration = new AppConfiguration(configuration);
         services.AddSingleton<IAppConfiguration>(appConfiguration);
 
-
         if (appConfiguration.HostingType == "Cloud")
         {
             // Azure Blob (example)
@@ -83,15 +80,16 @@ public static class DependencyInjection
         // Register Excel Cash Flow Parser
         services.AddScoped<IExcelCashFlowParser, ExcelCashFlowParser>();
 
+        // Saral.FileProcessor infrastructure services
+        services.AddScoped<Saral.FileProcessor.Core.Abstractions.IFileLoader, Saral.FileProcessor.IO.FileLoader>();
+        services.AddScoped<Saral.FileProcessor.Core.Services.IValidationConfigurationService, Saral.FileProcessor.Core.Services.ValidationConfigurationService>();
+        services.AddScoped<Saral.FileProcessor.Core.Services.IMultiFileValidator, Saral.FileProcessor.Core.Services.MultiFileValidator>();
+        services.AddScoped<Saral.FileProcessor.Core.Abstractions.IDataQualityAnalyzer, Saral.FileProcessor.Core.Analysis.DataQualityAnalyzer>();
+
         // Add after existing service registrations
         services.AddScoped<ILoanDetailsRepository, LoanDetailsRepository>();
         services.AddScoped<ICashFlowCalculationService, CashFlowCalculationService>();
         services.AddScoped<ICashFlowConfigurationValidator, CashFlowConfigurationValidator>();
-
-        // Register Cash Flow Discounting Service
-        services.AddScoped<ICashFlowDiscountingService, CashFlowDiscountingService>();
-        services.AddScoped<ICashFlowOrchestrationService, CashFlowOrchestrationService>();
-
 
         return services;
     }
@@ -109,6 +107,12 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<DatabaseSeeder>();
+
+        // Register Saral.FileProcessor DbContext
+        services.AddDbContext<Saral.FileProcessor.Data.Context.FileProcessorDbContext>(options =>
+            options.UseNpgsql(connectionString,
+                npgsqlOptions => npgsqlOptions.MigrationsHistoryTable(
+                    HistoryRepository.DefaultTableName, "fileprocessor")));
 
         return services;
     }

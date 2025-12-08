@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Application.Abstractions.Messaging;
 using Application.Files.UploadFile;
+using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
@@ -8,71 +9,109 @@ using Web.Api.Infrastructure;
 namespace Web.Api.Endpoints.Files;
 
 /// <summary>
-/// Represents an endpoint for handling file uploads via HTTP POST requests.
+/// Endpoint for uploading multiple files to the server with validation and metadata storage.
 /// </summary>
-/// <remarks>This endpoint processes file uploads by validating the file, extracting user information from the
-/// HTTP context, and dispatching a command to handle the uploaded file. The endpoint requires authorization and
-/// specific permissions to access.  The uploaded file is expected to be provided as an <see cref="IFormFile"/> in the
-/// request body. The endpoint validates the presence and content of the file, as well as the validity of the user's
-/// authentication token. If validation fails, an appropriate error response is returned.  Upon successful validation,
-/// the file content is read into memory and passed to a command handler for further processing. The handler is
-/// responsible for executing the business logic associated with the file upload.  The endpoint returns a 201 Created
-/// response with the file's URL if the operation succeeds, or an appropriate error response if it fails.</remarks>
+/// <remarks>
+/// This endpoint accepts multiple file uploads via HTTP POST requests, validates each file type and content,
+/// stores the files physically on the server in organized folder structures, and persists metadata to the database. 
+/// It supports Excel (.xlsx, .xls) and CSV file formats. The uploaded files are assigned unique identifiers and 
+/// stored with timestamp-based filenames to prevent conflicts. Authentication is required, and the user must have 
+/// the PDSetupAccess permission. Files are organized in folders based on collective impairment type and time period.
+/// 
+/// Maximum of 10 files can be uploaded per request.
+/// </remarks>
 internal sealed class UploadFile : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("/files/upload", async (
-            HttpContext httpContext,
+        app.MapPost("/files", async (
+            IFormFileCollection files,
             ICommandHandler<UploadFileCommand, UploadFileResponse> handler,
-            IFormFile file,
+            HttpContext context,
+            [FromForm] string collectiveImpairmentType,
+            [FromForm] string timePeriod,
             CancellationToken cancellationToken) =>
         {
-            // Validate file presence
-            if (file is null || file.Length == 0)
+            // Enhanced validation with pattern matching
+            Error? validationResult = (files?.Count ?? 0, collectiveImpairmentType, timePeriod) switch
             {
-                var failure = Result.Failure<UploadFileResponse>(new Error(
-                    "File.Empty",
-                    "No file was provided or the file is empty.",
-                    ErrorType.Validation
-                ));
-                return CustomResults.Problem(failure);
+                (0, _, _) => new Error("Files.Empty", "No files provided", ErrorType.Validation),
+                (> 10, _, _) => new Error("Files.TooMany", "Maximum 10 files allowed per upload", ErrorType.Validation),
+                (_, null or "", _) => new Error("CollectiveImpairmentType.Required", "Collective impairment type is required", ErrorType.Validation),
+                (_, _, null or "") => new Error("TimePeriod.Required", "Time period is required", ErrorType.Validation),
+                _ => null
+            };
+
+            if (validationResult is not null)
+            {
+                return CustomResults.Problem(Result.Failure<UploadFileResponse>(validationResult));
             }
 
-            // Extract UserId from claims
-            string? userIdString = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrWhiteSpace(userIdString) || !Guid.TryParse(userIdString, out Guid userId))
+            // Validate individual files
+            foreach (IFormFile file in files!)
+            {
+                Error? fileValidation = (file.FileName, file.Length) switch
+                {
+                    (null or "", _) => new Error("File.NoName", "File name is required", ErrorType.Validation),
+                    (_, 0) => new Error("File.Empty", "File cannot be empty", ErrorType.Validation),
+                    (_, > 50_000_000) => new Error("File.TooLarge", "File size exceeds 50MB limit", ErrorType.Validation),
+                    _ => null
+                };
+
+                if (fileValidation is not null)
+                {
+                    return CustomResults.Problem(Result.Failure<UploadFileResponse>(fileValidation));
+                }
+            }
+
+            // Extract UserId from token with modern pattern matching
+            Guid? userId = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value switch
+            {
+                { } value when Guid.TryParse(value, out Guid guid) => guid,
+                _ => (Guid?)null
+            };
+
+            if (userId is null)
             {
                 var failure = Result.Failure<UploadFileResponse>(new Error(
-                    "InvalidToken",
+                    "Authentication.InvalidToken",
                     "Invalid token: UserId not found",
                     ErrorType.Validation
                 ));
                 return CustomResults.Problem(failure);
             }
 
-            // Read file content
-            byte[] bytes;
-            using (var ms = new MemoryStream())
+            // Read file contents with modern using declarations
+            var fileDataList = new List<FileUploadData>();
+            
+            foreach (IFormFile file in files!)
             {
-                await file.CopyToAsync(ms, cancellationToken);
-                bytes = ms.ToArray();
+                using var memoryStream = new MemoryStream();
+                await file.CopyToAsync(memoryStream, cancellationToken);
+                byte[] bytes = memoryStream.ToArray();
+
+                fileDataList.Add(new FileUploadData(
+                    FileName: file.FileName,
+                    ContentType: file.ContentType ?? string.Empty,
+                    Content: bytes
+                ));
             }
 
             // Dispatch command via the handler (no MediatR)
             var command = new UploadFileCommand(
-                UploadedBy: userId,
-                FileName: file.FileName,
-                ContentType: file.ContentType ?? string.Empty,
-                Content: bytes
+                UploadedBy: userId.Value,
+                Files: fileDataList,
+                CollectiveImpairmentType: collectiveImpairmentType!,
+                TimePeriod: timePeriod!
             );
 
             Result<UploadFileResponse> result = await handler.Handle(command, cancellationToken);
 
-            return result.Match(
-                data => Results.Created(data.Url, data),
-                CustomResults.Problem
-            );
+            return result switch
+            {
+                { IsSuccess: true } => Results.Created($"/files", result.Value),
+                var failure => CustomResults.Problem(failure)
+            };
         })
         .RequireAuthorization()
         .HasPermission(PermissionRegistry.PDSetupAccess)
