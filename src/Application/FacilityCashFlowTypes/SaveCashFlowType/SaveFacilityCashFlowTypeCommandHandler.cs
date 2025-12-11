@@ -25,6 +25,11 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
     ILogger<SaveFacilityCashFlowTypeCommandHandler> logger)
     : ICommandHandler<SaveFacilityCashFlowTypeCommand, SaveFacilityCashFlowTypeResponse>
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public async Task<Result<SaveFacilityCashFlowTypeResponse>> Handle(
         SaveFacilityCashFlowTypeCommand command,
         CancellationToken cancellationToken)
@@ -116,11 +121,9 @@ internal sealed class SaveFacilityCashFlowTypeCommandHandler(
             }
 
             // Step 6: Create and save entity
-#pragma warning disable CA1869 // Cache and reuse 'JsonSerializerOptions' instances
             string configurationJson = JsonSerializer.Serialize(
                 command.Configuration,
-                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-#pragma warning restore CA1869 // Cache and reuse 'JsonSerializerOptions' instances
+                JsonOptions);
 
             var facilityCashFlowType = new FacilityCashFlowType
             {

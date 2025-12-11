@@ -13,12 +13,14 @@ using Domain.Organizations;
 using Domain.PasswordResetTokens;
 using Domain.PDAlgorithmResults;
 using Domain.PDCalculation;
+using Domain.PDProgressTrackings;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
 using Domain.RiskEvaluations;
 using Domain.RolePermissions;
 using Domain.Roles;
+using Domain.IndividualImpairment;
 using Domain.Scenarios;
 using Domain.Segments;
 using Domain.Todos;
@@ -76,6 +78,11 @@ public interface IApplicationDbContext
     DbSet<AgeBucketConfiguration> AgeBucketConfigurations { get; }
 
     DbSet<PDAlgorithmResult> PDAlgorithmResults { get; }
+
+    DbSet<PDProgressTracking> PDProgressTrackings { get; }
+
+    
+    DbSet<IndividualImpairmentCalculation> IndividualImpairmentCalculations { get; }
 
     DatabaseFacade Database { get; }
 

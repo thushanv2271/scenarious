@@ -8,7 +8,7 @@ public sealed class UploadedFileConfiguration : IEntityTypeConfiguration<Uploade
 {
     public void Configure(EntityTypeBuilder<UploadedFile> builder)
     {
-        builder.ToTable("UploadedFiles");
+        builder.ToTable("uploaded_files");
 
         builder.HasKey(x => x.Id);
 

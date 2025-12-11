@@ -66,18 +66,18 @@ internal sealed class Step4GenerateExtrapolationTables
                                            productCategory,
                                            segment);
 
-                    PdExtrapolationMethod1Dto method1Result = GenerateGeometricApproach(MacroEconomicFactorAdjustmentDto, segmentAveragePDTable);
-                    PdExtrapolationMethod2Dto method2Result = GenerateGeometricAndLognormalApproach(MacroEconomicFactorAdjustmentDto, segmentAveragePDTable);
-                    PdExtrapolationMethod3Dto method3Result = GenerateSurvivalRateApproach(MacroEconomicFactorAdjustmentDto, segmentAveragePDTable);
+                    PdExtrapolationMethod1Dto geometricApproachResult = GenerateGeometricApproach(MacroEconomicFactorAdjustmentDto, segmentAveragePDTable);
+                    PdExtrapolationMethod2Dto geometricAndLognormalApproachResult = GenerateGeometricAndLognormalApproach(MacroEconomicFactorAdjustmentDto, segmentAveragePDTable);
+                    PdExtrapolationMethod3Dto survivalRateApproachResult = GenerateSurvivalRateApproach(MacroEconomicFactorAdjustmentDto, segmentAveragePDTable);
 
                     PdExtrapolationSegmentDto segmentDto = new()
                     {
                         Segment = segment,
                         Summary = new PdExtrapolationSummaryDto
                         {
-                            Method1 = method1Result,
-                            Method2 = method2Result,
-                            Method3 = method3Result
+                            GeometricApproach = geometricApproachResult,
+                            GeometricAndLognormalApproach = geometricAndLognormalApproachResult,
+                            SurvivalRateApproach = survivalRateApproachResult
                         }
                     };
                     ProductCategoryDto.Segments.Add(segmentDto);

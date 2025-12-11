@@ -8,45 +8,63 @@ namespace Infrastructure.Repositories;
 /// <summary>
 /// Repository implementation for loan details queries
 /// Centralizes all raw SQL queries for loan_details table
+/// Uses DISTINCT ON to handle potential duplicates
 /// </summary>
 internal sealed class LoanDetailsRepository : ILoanDetailsRepository
 {
     private readonly IApplicationDbContext _context;
     private readonly ILogger<LoanDetailsRepository> _logger;
 
-    // SQL query constants to avoid magic strings
+    // SQL query constants - FIXED to handle duplicates using DISTINCT ON
     private const string FacilityCollateralQuery = @"
-        SELECT customer_number, facility_number, collateral_type, collateral_value
+        SELECT DISTINCT ON (facility_number, product_category) 
+            customer_number, 
+            facility_number, 
+            collateral_type, 
+            collateral_value
         FROM loan_details
         WHERE facility_number = @facilityNumber
-        ORDER BY period DESC
-        LIMIT 1";
+        ORDER BY facility_number, product_category, period DESC";
 
     private const string CustomerFacilitiesQuery = @"
-        SELECT 
-            customer_number, facility_number, product_category, segment, branch,
-            SUM(total_os) as total_os, MAX(interest_rate) as interest_rate,
-            MIN(grant_date) as grant_date, MAX(maturity_date) as maturity_date,
-            MAX(days_past_due) as days_past_due, MAX(bucket_label) as bucket_label
+        SELECT DISTINCT ON (facility_number, product_category)
+            customer_number, 
+            facility_number, 
+            product_category, 
+            segment, 
+            branch,
+            total_os,
+            interest_rate,
+            grant_date,
+            maturity_date,
+            days_past_due,
+            bucket_label
         FROM loan_details
         WHERE customer_number = @customerNumber
-        GROUP BY customer_number, facility_number, product_category, segment, branch
-        ORDER BY facility_number";
+        ORDER BY facility_number, product_category, period DESC";
 
     private const string FacilityBasicDetailsQuery = @"
-        SELECT customer_number, facility_number, product_category, segment
+        SELECT DISTINCT ON (facility_number, product_category)
+            customer_number, 
+            facility_number, 
+            product_category, 
+            segment
         FROM loan_details
         WHERE facility_number = @facilityNumber
-        LIMIT 1";
+        ORDER BY facility_number, product_category, period DESC";
 
     private const string FacilityLoanDetailsQuery = @"
-        SELECT 
-            customer_number, facility_number, total_os, interest_rate,
-            grant_date, maturity_date, installment_type
+        SELECT DISTINCT ON (facility_number, product_category)
+            customer_number, 
+            facility_number, 
+            total_os, 
+            interest_rate,
+            grant_date, 
+            maturity_date, 
+            installment_type
         FROM loan_details
         WHERE facility_number = @facilityNumber
-        ORDER BY period DESC
-        LIMIT 1";
+        ORDER BY facility_number, product_category, period DESC";
 
     public LoanDetailsRepository(
         IApplicationDbContext context,
@@ -57,7 +75,7 @@ internal sealed class LoanDetailsRepository : ILoanDetailsRepository
     }
 
     /// <summary>
-    /// Gets facility collateral information
+    /// Gets facility collateral information (latest snapshot)
     /// </summary>
     public async Task<FacilityCollateralDetail?> GetFacilityCollateralAsync(
         string facilityNumber,
@@ -84,7 +102,7 @@ internal sealed class LoanDetailsRepository : ILoanDetailsRepository
     }
 
     /// <summary>
-    /// Gets all facilities for a customer with aggregated data
+    /// Gets all facilities for a customer (latest snapshot per facility)
     /// </summary>
     public async Task<List<CustomerFacilityDetail>> GetCustomerFacilitiesAsync(
         string customerNumber,
@@ -119,7 +137,7 @@ internal sealed class LoanDetailsRepository : ILoanDetailsRepository
     }
 
     /// <summary>
-    /// Gets basic facility details for validation
+    /// Gets basic facility details for validation (latest snapshot)
     /// </summary>
     public async Task<FacilityBasicDetail?> GetFacilityBasicDetailsAsync(
         string facilityNumber,
@@ -146,7 +164,7 @@ internal sealed class LoanDetailsRepository : ILoanDetailsRepository
     }
 
     /// <summary>
-    /// Gets complete loan details for a facility
+    /// Gets complete loan details for a facility (latest snapshot)
     /// </summary>
     public async Task<FacilityLoanDetail?> GetFacilityLoanDetailsAsync(
         string facilityNumber,

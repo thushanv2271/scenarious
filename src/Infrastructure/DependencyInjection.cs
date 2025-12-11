@@ -5,8 +5,12 @@ using Application.Abstractions.Configuration;
 using Application.Abstractions.Data;
 using Application.Abstractions.Exporting;
 using Application.Abstractions.Parsing;
+using Application.Abstractions.Services;
+using Application.Abstractions.Pipeline;
 using Application.Abstractions.Storage;
 using Application.FacilityCashFlowTypes.SaveCashFlowType.Validators;
+using Application.IndividualImpairment.Services;
+using Application.PD.Services;
 using Application.ProductCategories;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
@@ -15,8 +19,10 @@ using Infrastructure.Database;
 using Infrastructure.Database.Seeding;
 using Infrastructure.DomainEvents;
 using Infrastructure.Exporting;
+using Infrastructure.PD;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
+using Infrastructure.Services.Pipeline;
 using Infrastructure.Storage;
 using Infrastructure.Time;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -26,6 +32,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
 using SharedKernel;
 
 namespace Infrastructure;
@@ -37,6 +44,7 @@ public static class DependencyInjection
         IConfiguration configuration) =>
         services
             .AddServices(configuration)
+            .AddRedis(configuration)
             .AddDatabase(configuration)
             .AddHealthChecks(configuration)
             .AddAuthenticationInternal(configuration)
@@ -51,6 +59,7 @@ public static class DependencyInjection
         services.AddSingleton<Application.Abstractions.Caching.IEclThresholdSummaryCache, Infrastructure.Caching.EclThresholdSummaryCache>();
         var appConfiguration = new AppConfiguration(configuration);
         services.AddSingleton<IAppConfiguration>(appConfiguration);
+
 
         if (appConfiguration.HostingType == "Cloud")
         {
@@ -74,6 +83,9 @@ public static class DependencyInjection
 
         // Register PD Calculation service as transient
         services.AddTransient<IPDCalculationService, PDCalculationService>();
+        // Register PD Pipeline orchestration service
+        services.AddTransient<IPDPipelineService, PDPipelineService>();
+
         // CSV Services
         services.AddScoped<ICsvParsingService, Services.CsvParsingService>();
 
@@ -90,6 +102,28 @@ public static class DependencyInjection
         services.AddScoped<ILoanDetailsRepository, LoanDetailsRepository>();
         services.AddScoped<ICashFlowCalculationService, CashFlowCalculationService>();
         services.AddScoped<ICashFlowConfigurationValidator, CashFlowConfigurationValidator>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddRedis(this IServiceCollection services, IConfiguration configuration)
+    {
+        string? redisConnectionString = configuration.GetConnectionString("Redis");
+        
+        if (!string.IsNullOrEmpty(redisConnectionString))
+        {
+            // Register Redis connection as singleton
+            services.AddSingleton<IConnectionMultiplexer>(sp =>
+                ConnectionMultiplexer.Connect(redisConnectionString));
+        }
+
+        // Register PD Progress Publisher
+        services.AddScoped<IPDProgressPublisher, PDProgressPublisher>();
+
+        // Register Cash Flow Discounting Service
+        services.AddScoped<ICashFlowDiscountingService, CashFlowDiscountingService>();
+        services.AddScoped<ICashFlowOrchestrationService, CashFlowOrchestrationService>();
+
 
         return services;
     }

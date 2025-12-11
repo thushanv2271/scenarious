@@ -438,7 +438,85 @@ namespace Infrastructure.Database.Migrations
                     b.HasKey("Id")
                         .HasName("pk_uploaded_files");
 
-                    b.ToTable("UploadedFiles", "public");
+                    b.ToTable("uploaded_files", "public");
+                });
+
+            modelBuilder.Entity("Domain.IndividualImpairment.IndividualImpairmentCalculation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("AmortizedCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amortized_cost");
+
+                    b.Property<Guid>("CalculatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("calculated_by");
+
+                    b.Property<DateTime>("CalculationDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("calculation_date");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CustomerNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("customer_number");
+
+                    b.Property<string>("FacilityNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("facility_number");
+
+                    b.Property<decimal>("ImpairmentAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("impairment_amount");
+
+                    b.Property<decimal>("ImpairmentPercentage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("impairment_percentage");
+
+                    b.Property<decimal>("InterestRate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("interest_rate");
+
+                    b.Property<string>("ScenarioDetailsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("scenario_details_json");
+
+                    b.Property<decimal>("SumOfPVOfCashFlows")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("sum_of_pv_of_cash_flows");
+
+                    b.HasKey("Id")
+                        .HasName("pk_individual_impairment_calculations");
+
+                    b.HasIndex("CalculationDate")
+                        .HasDatabaseName("ix_individual_impairment_calculations_calculation_date");
+
+                    b.HasIndex("CustomerNumber")
+                        .HasDatabaseName("ix_individual_impairment_calculations_customer_number");
+
+                    b.HasIndex("FacilityNumber")
+                        .HasDatabaseName("ix_individual_impairment_calculations_facility_number");
+
+                    b.HasIndex("CustomerNumber", "CalculationDate")
+                        .HasDatabaseName("ix_individual_impairment_calculations_customer_date");
+
+                    b.ToTable("individual_impairment_calculations", "public");
                 });
 
             modelBuilder.Entity("Domain.Industries.Industry", b =>
@@ -825,6 +903,99 @@ namespace Infrastructure.Database.Migrations
                         .HasDatabaseName("ix_loan_details_file_details_id");
 
                     b.ToTable("loan_details", "public");
+                });
+
+            modelBuilder.Entity("Domain.PDProgressTrackings.PDProgressTracking", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("message");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StepName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("step_name");
+
+                    b.Property<int>("StepOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("step_order");
+
+                    b.Property<string>("SubTaskName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sub_task_name");
+
+                    b.Property<int>("SubTaskOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sub_task_order");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pd_progress_tracking");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_pd_progress_tracking_is_active");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_pd_progress_tracking_session_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_pd_progress_tracking_status");
+
+                    b.HasIndex("SessionId", "StepOrder", "SubTaskOrder")
+                        .HasDatabaseName("ix_pd_progress_tracking_session_step_subtask");
+
+                    b.ToTable("pd_progress_tracking", "public");
                 });
 
             modelBuilder.Entity("Domain.PDTempData.PDTempData", b =>

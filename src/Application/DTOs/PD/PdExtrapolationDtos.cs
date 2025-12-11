@@ -52,18 +52,18 @@ public sealed class PdExtrapolationSummaryDto
 {
     /// <summary>
     /// Gets or sets Method 1 results (Geometric Approach)
-  /// </summary>
-  public PdExtrapolationMethod1Dto Method1 { get; set; } = new();
+    /// </summary>
+    public PdExtrapolationMethod1Dto GeometricApproach { get; set; } = new();
 
     /// <summary>
     /// Gets or sets Method 2 results (Geometric and Lognormal Approach)
-  /// </summary>
-    public PdExtrapolationMethod2Dto Method2 { get; set; } = new();
+    /// </summary>
+    public PdExtrapolationMethod2Dto GeometricAndLognormalApproach { get; set; } = new();
 
     /// <summary>
     /// Gets or sets Method 3 results (Survival Rate Approach)
     /// </summary>
-    public PdExtrapolationMethod3Dto Method3 { get; set; } = new();
+    public PdExtrapolationMethod3Dto SurvivalRateApproach { get; set; } = new();
 }
 
 /// <summary>

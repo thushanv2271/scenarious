@@ -177,8 +177,15 @@ public sealed class FileMovementService(
 
     private string ExtractFileNumber(string fileName)
     {
+        // Look for patterns like "PD_2025_01_..." - extract the third segment after second underscore
+        System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(fileName, @"^[^_]+_[^_]+_(\d+)");
+        if (match.Success)
+        {
+            return match.Groups[1].Value;
+        }
+        
         // Look for patterns like "File_1", "File1" anywhere in the string (not just at the end)
-        System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(fileName, @"File_?(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        match = System.Text.RegularExpressions.Regex.Match(fileName, @"File_?(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (match.Success)
         {
             return match.Groups[1].Value;

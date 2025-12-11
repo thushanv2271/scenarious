@@ -8,12 +8,14 @@ using Domain.EfaConfigs;
 using Domain.Exports;
 using Domain.FacilityCashFlowTypes;
 using Domain.Files;
+using Domain.IndividualImpairment;
 using Domain.Industries;
 using Domain.MasterData;
 using Domain.Organizations;
 using Domain.PasswordResetTokens;
 using Domain.PDAlgorithmResults;
 using Domain.PDCalculation;
+using Domain.PDProgressTrackings;
 using Domain.PDTempData;
 using Domain.Permissions;
 using Domain.ProductCategories;
@@ -54,6 +56,7 @@ public sealed class ApplicationDbContext(
     public DbSet<PDTempData> PDTempDatas { get; set; } = null!;
 
     public DbSet<CollectiveImpairmentConfig> CollectiveImpairmentConfigs { get; set; } = null!;
+    public DbSet<PDProgressTracking> PDProgressTrackings { get; set; } = null!;
 
     public DbSet<SegmentMaster> SegmentMasters { get; set; } = null!;
 
@@ -81,6 +84,7 @@ public sealed class ApplicationDbContext(
 
     public DbSet<AgeBucketConfiguration> AgeBucketConfigurations { get; set; } = null!;
 
+    public DbSet<IndividualImpairmentCalculation> IndividualImpairmentCalculations { get; set; }
 
     public DbSet<FacilityCashFlowType> FacilityCashFlowTypes { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)

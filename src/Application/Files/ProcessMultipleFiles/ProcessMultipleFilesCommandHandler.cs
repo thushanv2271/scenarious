@@ -7,6 +7,7 @@ using Application.Files.Services;
 using Application.Files.UploadFile;
 using Domain.CollectiveImpairment;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Saral.FileProcessor.Core.Services;
 using Saral.FileProcessor.Data.Extensions;
@@ -23,7 +24,8 @@ internal sealed class ProcessMultipleFilesCommandHandler(
     IFileProcessingResultService fileProcessingResultService,
     IOptions<FileStorageOptions> storageOptions,
     IOptions<ProcessedFilePathsOptions> processedFilePathsOptions,
-    IFileMovementService fileMovementService) : ICommandHandler<ProcessMultipleFilesCommand, ProcessMultipleFilesResponse>
+    IFileMovementService fileMovementService,
+    ILogger<ProcessMultipleFilesCommandHandler> logger) : ICommandHandler<ProcessMultipleFilesCommand, ProcessMultipleFilesResponse>
 {
     public async Task<Result<ProcessMultipleFilesResponse>> Handle(
 
@@ -43,22 +45,26 @@ internal sealed class ProcessMultipleFilesCommandHandler(
 
             if (!Enum.TryParse<ParameterType>(command.CollectiveImpairmentType, true, out ParameterType parameterType))
             {
+                logger.LogWarning("ProcessMultipleFiles invalid CollectiveImpairmentType: {CollectiveImpairmentType}", command.CollectiveImpairmentType);
                 return Result.Failure<ProcessMultipleFilesResponse>(Error.Problem(
                     "CollectiveImpairmentType.Invalid",
                     $"Invalid collective impairment type. Valid values are: {string.Join(", ", Enum.GetNames<ParameterType>())}."));
             }
 
+            logger.LogInformation("ProcessMultipleFiles fetching config for ParameterType: {ParameterType}", parameterType);
             CollectiveImpairmentConfig? config = await dbContext.CollectiveImpairmentConfigs
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Parameter == parameterType, cancellationToken);
 
             if (config is null)
             {
+                logger.LogWarning("ProcessMultipleFiles no config found for ParameterType: {ParameterType}", parameterType);
                 return Result.Failure<ProcessMultipleFilesResponse>(Error.Problem(
                     "CollectiveImpairmentConfig.NotFound",
                     $"No configuration found for collective impairment type '{parameterType}'."));
             }
 
+            logger.LogInformation("ProcessMultipleFiles config found, validating time period: {TimePeriod}", command.TimePeriod);
             // Validate time period against configuration
             Result<string> timePeriodValidation = FileProcessingUtilities.ValidateTimePeriod(command.TimePeriod, config.ConfigJson);
             if (!timePeriodValidation.IsSuccess)
@@ -66,7 +72,9 @@ internal sealed class ProcessMultipleFilesCommandHandler(
                 return Result.Failure<ProcessMultipleFilesResponse>(timePeriodValidation.Error);
             }
 
+            logger.LogInformation("ProcessMultipleFiles building directory path from storage options");
             string configuredRoot = storageOptions.Value.RootPath ?? string.Empty;
+            logger.LogInformation("ProcessMultipleFiles configured root: {ConfiguredRoot}", configuredRoot);
 
             string expandedRoot = string.IsNullOrWhiteSpace(configuredRoot)
             ? Path.GetTempPath()
@@ -77,40 +85,51 @@ internal sealed class ProcessMultipleFilesCommandHandler(
                 : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, expandedRoot));
 
             string parameterFolder = Path.Combine(rootPath, parameterType.ToString());
+            logger.LogInformation("ProcessMultipleFiles parameter folder: {ParameterFolder}", parameterFolder);
 
             // Create hierarchical folder structure based on frequency
             string timePeriodFolder = FileProcessingUtilities.CreateTimePeriodFolderPath(parameterFolder, command.TimePeriod, config.ConfigJson);
+            logger.LogInformation("ProcessMultipleFiles time period folder: {TimePeriodFolder}", timePeriodFolder);
 
             if (!Directory.Exists(timePeriodFolder))
             {
+                logger.LogWarning("ProcessMultipleFiles directory does not exist: {TimePeriodFolder}", timePeriodFolder);
                 return Result.Failure<ProcessMultipleFilesResponse>(Error.Problem(
                     "Directory.NotFound",
                     $"No directory found '{timePeriodFolder}'."));
             }
 
+            logger.LogInformation("ProcessMultipleFiles scanning for files in directory: {TimePeriodFolder}", timePeriodFolder);
             string[] files = Directory.GetFiles(timePeriodFolder);
+            logger.LogInformation("ProcessMultipleFiles found {FileCount} files", files.Length);
 
             if (files.Length == 0)
             {
+                logger.LogWarning("ProcessMultipleFiles no files found in directory: {TimePeriodFolder}", timePeriodFolder);
                 return Result.Failure<ProcessMultipleFilesResponse>(Error.Problem(
                     "Files.NotFound",
                     $"No files found in directory '{timePeriodFolder}'."));
             }
 
             var sessionId = Guid.CreateVersion7();
+            logger.LogInformation("ProcessMultipleFiles starting file processing with session ID: {SessionId}", sessionId);
 
             // Call Saral.FileProcessor service with file paths and database integration
+            logger.LogInformation("ProcessMultipleFiles calling FileProcessor service for {FileCount} files", files.Length);
             (Saral.FileProcessor.Core.Models.MultiFileAnalysisResult analysisResult, List<int> _) = await fileProcessingService.ProcessMultipleFilesWithDatabaseAsync(
                 fileProcessingResultService,
                 files,
                 sessionId.ToString(),
                 null, 
                 cancellationToken);
+            logger.LogInformation("ProcessMultipleFiles FileProcessor completed, individual results count: {ResultCount}", analysisResult.IndividualResults.Count);
 
             // Fetch results from database for accurate data
+            logger.LogInformation("ProcessMultipleFiles fetching validation results from database for session: {SessionId}", sessionId);
             List<Domain.Files.FileValidationResult> fileValidationResults = await dbContext.FileValidationResults
                 .Where(fvr => fvr.SessionId == sessionId)
                 .ToListAsync(cancellationToken);
+            logger.LogInformation("ProcessMultipleFiles found {ValidationResultCount} validation results in database", fileValidationResults.Count);
 
             // Create response with actual data from analysis and database
             IndividualFileResult[] individualResults = [.. analysisResult.IndividualResults.Select((r, index) => {

@@ -79,38 +79,35 @@ internal sealed class CreateScenarioCommandHandler(
             Guid? uploadedFileId = null;
             UploadedFileDetailResponse? uploadedFileDetail = null;
 
-            // Create uploaded file if provided
+            // Reference existing uploaded file by ID
             if (item.UploadFile is not null)
             {
-                var uploadedFile = new UploadedFile
-                {
-                    Id = Guid.CreateVersion7(),
-                    OriginalFileName = item.UploadFile.OriginalFileName,
-                    StoredFileName = item.UploadFile.StoredFileName,
-                    ContentType = item.UploadFile.ContentType,
-                    Size = item.UploadFile.Size,
-                    PhysicalPath = string.Empty,
-                    PublicUrl = item.UploadFile.Url.ToString(),
-                    UploadedBy = item.UploadFile.UploadedBy,
-                    UploadedAt = DateTimeOffset.UtcNow
-                };
+                // Verify the file exists
+                UploadedFile? existingFile = await context.UploadedFiles
+                    .FirstOrDefaultAsync(f => f.Id == item.UploadFile.Id, cancellationToken);
 
-                context.UploadedFiles.Add(uploadedFile);
-                uploadedFileId = uploadedFile.Id;
+                if (existingFile is null)
+                {
+                    return Result.Failure<CreateScenarioResponse>(
+                        Error.NotFound("UploadedFile.NotFound",
+                            $"Uploaded file with ID '{item.UploadFile.Id}' was not found"));
+                }
+
+                uploadedFileId = existingFile.Id;  // ← Use existing file ID
 
                 uploadedFileDetail = new UploadedFileDetailResponse(
-                    uploadedFile.Id,
-                    uploadedFile.OriginalFileName,
-                    uploadedFile.StoredFileName,
-                    uploadedFile.ContentType,
-                    uploadedFile.Size,
-                    new Uri(uploadedFile.PublicUrl),  // Convert string to Uri
-                    uploadedFile.UploadedBy,
-                    uploadedFile.UploadedAt
+                    existingFile.Id,
+                    existingFile.OriginalFileName,
+                    existingFile.StoredFileName,
+                    existingFile.ContentType,
+                    existingFile.Size,
+                    new Uri(existingFile.PublicUrl), // Convert string to Uri
+                    existingFile.UploadedBy,
+                    existingFile.UploadedAt
                 );
             }
 
-            // Create scenario
+            // Create scenario 
             var scenario = new Scenario
             {
                 Id = Guid.CreateVersion7(),
@@ -121,7 +118,7 @@ internal sealed class CreateScenarioCommandHandler(
                 LastQuarterCashFlowsEnabled = item.LastQuarterCashFlowsEnabled,
                 OtherCashFlowsEnabled = item.OtherCashFlowsEnabled,
                 CollateralValueEnabled = item.CollateralValueEnabled,
-                UploadedFileId = uploadedFileId,
+                UploadedFileId = uploadedFileId, 
                 CreatedAt = dateTimeProvider.UtcNow,
                 UpdatedAt = dateTimeProvider.UtcNow
             };

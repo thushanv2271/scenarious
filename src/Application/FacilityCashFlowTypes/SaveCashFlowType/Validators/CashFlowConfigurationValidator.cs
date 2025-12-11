@@ -9,9 +9,6 @@ namespace Application.FacilityCashFlowTypes.SaveCashFlowType.Validators;
 /// </summary>
 public sealed class CashFlowConfigurationValidator : ICashFlowConfigurationValidator
 {
-    // Valid frequency values
-    private static readonly string[] ValidFrequencies = { "Monthly", "Quarterly", "Annually" };
-
     public Result Validate(CashFlowsType cashFlowType, CashFlowConfigurationDto configuration)
     {
         return cashFlowType switch
@@ -31,7 +28,7 @@ public sealed class CashFlowConfigurationValidator : ICashFlowConfigurationValid
     /// </summary>
     private static Result ValidateContractModification(CashFlowConfigurationDto configuration)
     {
-        bool hasParameters = !string.IsNullOrWhiteSpace(configuration.Frequency) &&
+        bool hasParameters = configuration.Frequency.HasValue &&
                             configuration.Value.HasValue &&
                             configuration.TenureMonths.HasValue;
 
@@ -58,10 +55,11 @@ public sealed class CashFlowConfigurationValidator : ICashFlowConfigurationValid
                     "Tenure months must be greater than zero"));
             }
 
-            if (!ValidFrequencies.Contains(configuration.Frequency!, StringComparer.OrdinalIgnoreCase))
+            // FIX: Use generic Enum.IsDefined<TEnum>
+            if (!Enum.IsDefined(configuration.Frequency!.Value))
             {
                 return Result.Failure(FacilityCashFlowTypeErrors.InvalidConfiguration(
-                    "Frequency must be Monthly, Quarterly, or Annually"));
+                    "Frequency must be Monthly, Quarterly, Semi-Annually, or Annually"));
             }
         }
 
