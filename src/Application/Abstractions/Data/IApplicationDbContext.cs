@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using Domain.Authentication;
 using Domain.Branches;
+using Domain.Collaterals;
 using Domain.CollectiveImpairment;
 using Domain.Configurations;
 using Domain.EfaConfigs;
@@ -8,6 +9,8 @@ using Domain.Exports;
 using Domain.FacilityCashFlowTypes;
 using Domain.Files;
 using Domain.Industries;
+using Domain.LGDCalculation;
+using Domain.LGDProgressTrackings;
 using Domain.MasterData;
 using Domain.Organizations;
 using Domain.PasswordResetTokens;
@@ -59,6 +62,13 @@ public interface IApplicationDbContext
     DbSet<FileDetails> FileDetails { get; }
     DbSet<LoanDetails> LoanDetails { get; }
 
+    // LGD Calculation entities
+    DbSet<LgdFileDetails> LgdFileDetails { get; }
+    DbSet<LgdDetails> LgdDetails { get; }
+
+    // VC LGD Calculation entities
+    DbSet<VCLgdFileDetails> VCLgdFileDetails { get; }
+    DbSet<VCLgdDetails> VCLgdDetails { get; }
 
     DbSet<EfaConfiguration> EfaConfigurations { get; }
 
@@ -68,6 +78,7 @@ public interface IApplicationDbContext
     DbSet<ProductCategory> ProductCategories { get; }
     DbSet<Segment> Segments { get; }
     DbSet<Industry> Industries { get; }
+    DbSet<Collateral> Collaterals { get; }
     DbSet<Scenario> Scenarios { get; }
     DbSet<FacilityCashFlowType> FacilityCashFlowTypes { get; }
 
@@ -78,10 +89,13 @@ public interface IApplicationDbContext
     DbSet<AgeBucketConfiguration> AgeBucketConfigurations { get; }
 
     DbSet<PDAlgorithmResult> PDAlgorithmResults { get; }
+    DbSet<LgdAlgorithmResult> LgdAlgorithmResults { get; }
 
     DbSet<PDProgressTracking> PDProgressTrackings { get; }
 
-    
+    DbSet<LgdProgressTracking> LgdProgressTrackings { get; }
+
+
     DbSet<IndividualImpairmentCalculation> IndividualImpairmentCalculations { get; }
 
     DatabaseFacade Database { get; }

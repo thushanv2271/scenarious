@@ -1,8 +1,7 @@
-﻿
-namespace Application.PDAlgorithmResults.GetSelectedMethodologies;
+﻿namespace Application.PDAlgorithmResults.GetSelectedMethodologies;
 
 /// <summary>
-/// Paginated response containing all selected methodologies
+/// Response containing all selected methodologies with pagination
 /// </summary>
 public sealed record GetSelectedMethodologiesResponse(
     List<PDAlgorithmResultMethodologyDto> Results,
@@ -10,7 +9,7 @@ public sealed record GetSelectedMethodologiesResponse(
 );
 
 /// <summary>
-/// Represents a single PD Algorithm Result with its selected methodologies
+/// PD Algorithm Result containing methodology information
 /// </summary>
 public sealed record PDAlgorithmResultMethodologyDto(
     Guid Id,
@@ -20,7 +19,7 @@ public sealed record PDAlgorithmResultMethodologyDto(
 );
 
 /// <summary>
-/// Product category with its segments and their selected methodologies
+/// Product category containing segments with selected methodologies
 /// </summary>
 public sealed record ProductCategoryMethodologyDto(
     string ProductCategory,
@@ -28,25 +27,28 @@ public sealed record ProductCategoryMethodologyDto(
 );
 
 /// <summary>
-/// Segment with its selected methodology and full data
+/// Segment with selected methodology and its data
 /// </summary>
 public sealed record SegmentMethodologyDto(
     string Segment,
-    string? SelectedMethodology,
+    string SelectedMethodology,
     MethodologyDataDto? SelectedMethodologyData
 );
 
 /// <summary>
-/// Full methodology data containing all PD tables
+/// Complete methodology data structure containing all possible tables
 /// </summary>
 public sealed record MethodologyDataDto(
     PdTableDto? MarginalPdsAfterEfa,
     PdTableDto? ExtrapolatedCumulativePdsAfterEfa,
-    PdTableDto? ExtrapolatedCumulativePdsBeforeEfa
+    PdTableDto? ExtrapolatedCumulativePdsBeforeEfa,
+    PdTableDto? SurvivalRates,
+    PdTableDto? MarginalPds,
+    PdTableDto? EfaAdjustedPds
 );
 
 /// <summary>
-/// PD Table with title, headers, and rows
+/// PD Table with full structure
 /// </summary>
 public sealed record PdTableDto(
     string Title,

@@ -10,6 +10,7 @@ using Application.Abstractions.Pipeline;
 using Application.Abstractions.Storage;
 using Application.FacilityCashFlowTypes.SaveCashFlowType.Validators;
 using Application.IndividualImpairment.Services;
+using Application.LGD.Services;
 using Application.PD.Services;
 using Application.ProductCategories;
 using Infrastructure.Authentication;
@@ -19,6 +20,7 @@ using Infrastructure.Database;
 using Infrastructure.Database.Seeding;
 using Infrastructure.DomainEvents;
 using Infrastructure.Exporting;
+using Infrastructure.LGD;
 using Infrastructure.PD;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
@@ -83,8 +85,13 @@ public static class DependencyInjection
 
         // Register PD Calculation service as transient
         services.AddTransient<IPDCalculationService, PDCalculationService>();
+
+        // Register LGD Calculation service as transient
+        services.AddTransient<ILgdCalculationService, LgdCalculationService>();
         // Register PD Pipeline orchestration service
         services.AddTransient<IPDPipelineService, PDPipelineService>();
+        // Register LGD Pipeline orchestration service
+        services.AddTransient<ILgdPipelineService, LgdPipelineService>();
 
         // CSV Services
         services.AddScoped<ICsvParsingService, Services.CsvParsingService>();
@@ -109,7 +116,7 @@ public static class DependencyInjection
     private static IServiceCollection AddRedis(this IServiceCollection services, IConfiguration configuration)
     {
         string? redisConnectionString = configuration.GetConnectionString("Redis");
-        
+
         if (!string.IsNullOrEmpty(redisConnectionString))
         {
             // Register Redis connection as singleton
@@ -119,6 +126,9 @@ public static class DependencyInjection
 
         // Register PD Progress Publisher
         services.AddScoped<IPDProgressPublisher, PDProgressPublisher>();
+
+        // Register LGD Progress Publisher
+        services.AddScoped<ILgdProgressPublisher, LgdProgressPublisher>();
 
         // Register Cash Flow Discounting Service
         services.AddScoped<ICashFlowDiscountingService, CashFlowDiscountingService>();

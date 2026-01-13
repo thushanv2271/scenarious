@@ -21,7 +21,6 @@ namespace Application.Files.ProcessMultipleFiles;
 internal sealed class ProcessMultipleFilesCommandHandler(
     IApplicationDbContext dbContext,
     IFileProcessingService fileProcessingService,
-    IFileProcessingResultService fileProcessingResultService,
     IOptions<FileStorageOptions> storageOptions,
     IOptions<ProcessedFilePathsOptions> processedFilePathsOptions,
     IFileMovementService fileMovementService,
@@ -114,22 +113,44 @@ internal sealed class ProcessMultipleFilesCommandHandler(
             var sessionId = Guid.CreateVersion7();
             logger.LogInformation("ProcessMultipleFiles starting file processing with session ID: {SessionId}", sessionId);
 
-            // Call Saral.FileProcessor service with file paths and database integration
+            // Process files directly without database integration (validation results go to JSON instead)
             logger.LogInformation("ProcessMultipleFiles calling FileProcessor service for {FileCount} files", files.Length);
-            (Saral.FileProcessor.Core.Models.MultiFileAnalysisResult analysisResult, List<int> _) = await fileProcessingService.ProcessMultipleFilesWithDatabaseAsync(
-                fileProcessingResultService,
-                files,
-                sessionId.ToString(),
-                null, 
-                cancellationToken);
-            logger.LogInformation("ProcessMultipleFiles FileProcessor completed, individual results count: {ResultCount}", analysisResult.IndividualResults.Count);
+            Saral.FileProcessor.Core.Models.MultiFileAnalysisResult analysisResult = 
+                await fileProcessingService.ProcessMultipleFilesAsync(
+                    files,
+                    null,
+                    cancellationToken);
+            logger.LogInformation("ProcessMultipleFiles FileProcessor completed, individual results count: {ResultCount}", 
+                analysisResult.IndividualResults.Count);
 
-            // Fetch results from database for accurate data
-            logger.LogInformation("ProcessMultipleFiles fetching validation results from database for session: {SessionId}", sessionId);
-            List<Domain.Files.FileValidationResult> fileValidationResults = await dbContext.FileValidationResults
-                .Where(fvr => fvr.SessionId == sessionId)
-                .ToListAsync(cancellationToken);
-            logger.LogInformation("ProcessMultipleFiles found {ValidationResultCount} validation results in database", fileValidationResults.Count);
+            // Build validation results directly from analysis result (no database query needed)
+            var fileValidationResults = analysisResult.IndividualResults.Select(r =>
+            {
+                Saral.FileProcessor.Core.Models.AnalysisResult analysis = r.Analysis;
+                int totalErrors = analysis.ValidationSummary?.RowValidations.Count(rv => !rv.IsValid) ?? 0;
+                string status = totalErrors > 0 ? "HasValidationErrors" : "Valid";
+                
+                return new Domain.Files.FileValidationResult
+                {
+                    Filename = r.FileName,
+                    TotalRows = analysis.TotalRows,
+                    TotalErrors = totalErrors,
+                    Status = status,
+                    SessionId = sessionId,
+                    TimePeriod = command.TimePeriod,                      // ADD THIS
+                    CollectiveImpairmentType = parameterType.ToString(),  // ADD THIS
+                    CreatedOnUtc = DateTime.UtcNow
+                };
+            }).ToList();
+
+            logger.LogInformation("ProcessMultipleFiles built {ValidationResultCount} validation results from analysis", 
+                fileValidationResults.Count);
+
+            // Save validation results to database
+            dbContext.FileValidationResults.AddRange(fileValidationResults);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("ProcessMultipleFiles saved {ValidationResultCount} validation results to database", 
+                fileValidationResults.Count);
 
             // Create response with actual data from analysis and database
             IndividualFileResult[] individualResults = [.. analysisResult.IndividualResults.Select((r, index) => {
@@ -218,6 +239,32 @@ internal sealed class ProcessMultipleFilesCommandHandler(
                             else if (movementResult.Value.FailedMoves > 0)
                             {
                                 fileMovementErrors = $"Failed to move {movementResult.Value.FailedMoves} out of {movementResult.Value.TotalFiles} files. Errors: {string.Join("; ", movementResult.Value.Errors)}";
+                            }
+                            else
+                            {
+                                // Update UploadedFile entities with new PhysicalPath after successful move
+                                foreach (KeyValuePair<string, string> movedFile in movementResult.Value.MovedFiles)
+                                {
+                                    string oldPath = movedFile.Key;
+                                    string newPath = movedFile.Value;
+                                    string fileName = Path.GetFileName(oldPath);
+                                    
+                                    Domain.Files.UploadedFile? uploadedFile = await dbContext.UploadedFiles
+                                        .FirstOrDefaultAsync(uf => uf.StoredFileName == fileName, cancellationToken);
+                                    
+                                    if (uploadedFile is not null)
+                                    {
+                                        // Update the physical path
+                                        uploadedFile.PhysicalPath = newPath;
+                                        logger.LogInformation("Updated PhysicalPath for file {FileName} from {OldPath} to {NewPath}", 
+                                            fileName, oldPath, newPath);
+                                    }
+                                }
+                                
+                                // Save changes to database
+                                await dbContext.SaveChangesAsync(cancellationToken);
+                                logger.LogInformation("Successfully updated {Count} UploadedFile records with new paths", 
+                                    movementResult.Value.MovedFiles.Count);
                             }
                         }
                         catch (Exception ex)

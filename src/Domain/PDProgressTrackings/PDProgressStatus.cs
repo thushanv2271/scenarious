@@ -5,5 +5,6 @@ public enum PDProgressStatus
     Pending,
     InProgress,
     Completed,
-    Failed
+    Failed,
+    Error
 }

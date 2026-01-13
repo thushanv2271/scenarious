@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <PackageReference Include="ClosedXML" />
+    <PackageReference Include="CsvHelper" />
     <PackageReference Include="Deedle" />
     <PackageReference Include="EPPlus" />
     
@@ -25,6 +26,7 @@
 
   <ItemGroup>
     <Folder Include="Roles\EditRoleCommand\" />
+    <Folder Include="Tests\" />
   </ItemGroup>
 
   <ItemGroup>

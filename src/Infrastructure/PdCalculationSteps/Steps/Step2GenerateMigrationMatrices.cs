@@ -663,24 +663,31 @@ private List<string> GetSmallPortfolioPeriodsList(string periodN, string periodN
                 }
                 else if (rowTotal > 0)
                 {
-                    double percentage = (double)matrix.Counts.Matrix[fromIndex][toIndex] / rowTotal * 100.0;
-                    matrix.Percentages.Matrix[fromIndex][toIndex] = Math.Round(percentage, 2);
+                    double transitionCount = matrix.Counts.Matrix[fromIndex][toIndex];
+                    double percentage = transitionCount / rowTotal * 100.0;
+                    matrix.Percentages.Matrix[fromIndex][toIndex] = percentage;
                 }
                 else
                 {
-                    matrix.Percentages.Matrix[fromIndex][toIndex] = null;
+                    matrix.Percentages.Matrix[fromIndex][toIndex] = 0;
+                }
+
+                if(toIndex == bucketCount - 1 && fromIndex == bucketCount - 1)
+                {
+                    if (rowTotal > 0)
+                    {
+                        double transitionCount = matrix.Counts.Matrix[fromIndex][toIndex];
+                        double percentage = transitionCount / rowTotal * 100.0;
+                        matrix.Percentages.Matrix[fromIndex][toIndex] = percentage;
+                    }
+                    else
+                    {
+                        matrix.Percentages.Matrix[fromIndex][toIndex] = 0;
+                    }
                 }
             }
 
-            if (rowTotal > 0)
-            {
-                double exitPercentage = (double)matrix.Counts.ExitCounts[fromIndex] / rowTotal * 100.0;
-                matrix.Percentages.ExitPercentages[fromIndex] = Math.Round(exitPercentage, 2);
-            }
-            else
-            {
-                matrix.Percentages.ExitPercentages[fromIndex] = null;
-            }
+            matrix.Percentages.ExitPercentages[fromIndex] = null;
         }
     }
 
@@ -709,13 +716,7 @@ private List<string> GetSmallPortfolioPeriodsList(string periodN, string periodN
                 }
             }
 
-            double? exitPercentage = matrix.Percentages.ExitPercentages[fromBucket];
-            if (exitPercentage.HasValue)
-            {
-                cumulativePD += exitPercentage.Value / 100.0 * 100.0;
-            }
-
-            grandTotal[fromBucket] = Math.Round(cumulativePD, 2);
+            grandTotal[fromBucket] = cumulativePD;
         }
 
         matrix.Percentages.GrandTotal = grandTotal;

@@ -12,4 +12,6 @@ public static class Tags
     public const string CashFlowTypes = "Cash Flow Types";
     public const string CashFlowProjections = "Cash Flow Projections";
     public const string PDAlgorithmResults = "PD Algorithm Results";
+    public const string LgdAlgorithmResults = "LGD Algorithm Results";
+    public const string IndividualImpairment = "Individual Impairment";
 }

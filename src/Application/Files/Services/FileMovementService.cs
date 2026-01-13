@@ -45,6 +45,7 @@ public sealed record FileMovementResult(
 
 /// <summary>
 /// Implementation of file movement service.
+/// Moves files from hierarchical pending folders to FLAT processed folder for easier next-step processing.
 /// </summary>
 public sealed class FileMovementService(
     IOptions<ProcessedFilePathsOptions> processedFilePathsOptions,
@@ -66,16 +67,17 @@ public sealed class FileMovementService(
 
         try
         {
+            // Get flat destination path (e.g., /data/PD/processed) - NO hierarchical structure
             string destinationPath = GetDestinationPath(parameterType);
             string fullDestinationPath = Environment.ExpandEnvironmentVariables(destinationPath);
 
-            // Ensure destination directory exists
+            // Ensure flat destination directory exists
             if (!Directory.Exists(fullDestinationPath))
             {
                 try
                 {
                     Directory.CreateDirectory(fullDestinationPath);
-                    logger.LogInformation("Created destination directory: {Path}", fullDestinationPath);
+                    logger.LogInformation("Created flat destination directory: {Path}", fullDestinationPath);
                 }
                 catch (Exception ex)
                 {
@@ -99,12 +101,13 @@ public sealed class FileMovementService(
                         continue;
                     }
 
+                    // Generate new filename with standardized format
                     string newFileName = GenerateNewFileName(filePath, parameterType, timePeriod, configJson);
+                    
+                    // Combine with FLAT destination path (no hierarchical subdirectories)
                     string destinationFilePath = Path.Combine(fullDestinationPath, newFileName);
 
-
-
-                    // Ensure destination directory exists for the specific file
+                    // Ensure destination directory exists (should already exist from above)
                     string? destinationDirectory = Path.GetDirectoryName(destinationFilePath);
                     if (!string.IsNullOrEmpty(destinationDirectory) && !Directory.Exists(destinationDirectory))
                     {
@@ -117,7 +120,7 @@ public sealed class FileMovementService(
                     movedFiles[filePath] = destinationFilePath;
                     successfulMoves++;
                     
-                    logger.LogInformation("Successfully moved and renamed file from {Source} to {Destination}", 
+                    logger.LogInformation("Successfully moved file from {Source} to {Destination}", 
                         filePath, destinationFilePath);
                 }
                 catch (Exception ex)
@@ -136,8 +139,8 @@ public sealed class FileMovementService(
                 Errors: errors,
                 MovedFiles: movedFiles);
 
-            logger.LogInformation("File movement completed. Total: {Total}, Success: {Success}, Failed: {Failed}", 
-                result.TotalFiles, result.SuccessfulMoves, result.FailedMoves);
+            logger.LogInformation("File movement completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Destination: {Path}", 
+                result.TotalFiles, result.SuccessfulMoves, result.FailedMoves, fullDestinationPath);
 
             return Result.Success(result);
         }
@@ -177,14 +180,23 @@ public sealed class FileMovementService(
 
     private string ExtractFileNumber(string fileName)
     {
+        // Look for patterns like "PD_2025_01_..." or similar - extract the segment after time period
+        System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(fileName, @"_(\d{8})_(\d{6})_([a-f0-9]{8})");
+        if (match.Success)
+        {
+            // This is a timestamped filename like "Portfolio_Data_20260111_172322_d10c84ce"
+            // Use the short GUID part as the file number
+            return match.Groups[3].Value;
+        }
+        
         // Look for patterns like "PD_2025_01_..." - extract the third segment after second underscore
-        System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(fileName, @"^[^_]+_[^_]+_(\d+)");
+        match = System.Text.RegularExpressions.Regex.Match(fileName, @"^[^_]+_[^_]+_(\d+)");
         if (match.Success)
         {
             return match.Groups[1].Value;
         }
         
-        // Look for patterns like "File_1", "File1" anywhere in the string (not just at the end)
+        // Look for patterns like "File_1", "File1" anywhere in the string
         match = System.Text.RegularExpressions.Regex.Match(fileName, @"File_?(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (match.Success)
         {
@@ -198,8 +210,9 @@ public sealed class FileMovementService(
             return match.Groups[1].Value;
         }
         
-        // If no number found, default to "1"
-        return "1";
+        // If no number found, use a hash of the filename for uniqueness
+        int hash = Math.Abs(fileName.GetHashCode());
+        return hash.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private string FormatTimePeriodForFileName(string timePeriod, string configJson)
@@ -243,32 +256,32 @@ public sealed class FileMovementService(
 
     private string FormatQuarterlyTimePeriod(string timePeriod)
     {
-        // Expected formats: "2024-Q1", "2024Q1" -> "2024_Q1"
+        // Expected formats: "2024-Q1", "2024Q1" -> "2024Q1"
         System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(timePeriod, @"(\d{4})[-_]?Q(\d)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (match.Success)
         {
             string year = match.Groups[1].Value;
             string quarter = match.Groups[2].Value;
-            return $"{year}_Q{quarter}";
+            return $"{year}Q{quarter}";
         }
         return timePeriod;
     }
 
     private string FormatMonthlyTimePeriod(string timePeriod)
     {
-        // Expected formats: "2024-03", "2024-3", "202403" -> "2024_03"
+        // Expected formats: "2024-03", "2024-3", "202403" -> "2024-03"
         System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(timePeriod, @"(\d{4})[-_]?(\d{1,2})");
         if (match.Success)
         {
             string year = match.Groups[1].Value;
             string month = match.Groups[2].Value.PadLeft(2, '0');
-            return $"{year}_{month}";
+            return $"{year}-{month}";
         }
         
         // Try parsing as date
         if (DateTime.TryParse(timePeriod, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime date))
         {
-            return $"{date.Year}_{date.Month:D2}";
+            return $"{date.Year}-{date.Month:D2}";
         }
         
         return timePeriod;

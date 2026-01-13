@@ -19,19 +19,23 @@ public static class ExcelReader
     /// <param name="fileDetailsId">ID of the file details record</param>
     /// <param name="quarterEndDate">Quarter end date for calculations</param>
     /// <param name="frequency">Frequency type for remaining maturity calculation</param>
+    /// <param name="fileName">The name of the file being processed</param>
+    /// <param name="isLatestPortfolio">True if this file is part of the latest portfolio</param>
     /// <returns>List of loan details creation requests</returns>
     public static List<LoanDetailsCreationRequest> ReadLoanDataFromExcel(
         string filePath,
         Guid fileDetailsId,
         DateTime quarterEndDate,
-        FrequencyType frequency)
+        FrequencyType frequency,
+        string fileName,
+        bool isLatestPortfolio)
     {
         string extension = Path.GetExtension(filePath).ToUpperInvariant();
 
         return extension switch
         {
-            ".CSV" => ReadLoanDataFromCsv(filePath, fileDetailsId, quarterEndDate, frequency),
-            ".XLSX" or ".XLSM" or ".XLTX" or ".XLTM" => ReadLoanDataFromExcelFile(filePath, fileDetailsId, quarterEndDate, frequency),
+            ".CSV" => ReadLoanDataFromCsv(filePath, fileDetailsId, quarterEndDate, frequency, fileName, isLatestPortfolio),
+            ".XLSX" or ".XLSM" or ".XLTX" or ".XLTM" => ReadLoanDataFromExcelFile(filePath, fileDetailsId, quarterEndDate, frequency, fileName, isLatestPortfolio),
             _ => throw new NotSupportedException($"File extension '{extension}' is not supported. Supported extensions are '.csv', '.xlsx', '.xlsm', '.xltx' and '.xltm'.")
         };
     }
@@ -43,7 +47,9 @@ public static class ExcelReader
         string filePath,
         Guid fileDetailsId,
         DateTime quarterEndDate,
-        FrequencyType frequency)
+        FrequencyType frequency,
+        string fileName,
+        bool isLatestPortfolio)
     {
         List<LoanDetailsCreationRequest> loanDetailsList = [];
 
@@ -73,7 +79,9 @@ public static class ExcelReader
                     columnMapping,
                     fileDetailsId,
                     quarterEndDate,
-                    frequency);
+                    frequency,
+                    fileName,
+                    isLatestPortfolio);
 
                 loanDetailsList.Add(loanDetails);
             }
@@ -94,7 +102,9 @@ public static class ExcelReader
         string filePath,
         Guid fileDetailsId,
         DateTime quarterEndDate,
-        FrequencyType frequency)
+        FrequencyType frequency,
+        string fileName,
+        bool isLatestPortfolio)
     {
         List<LoanDetailsCreationRequest> loanDetailsList = [];
 
@@ -119,7 +129,9 @@ public static class ExcelReader
                     columnMapping,
                     fileDetailsId,
                     quarterEndDate,
-                    frequency);
+                    frequency,
+                    fileName,
+                    isLatestPortfolio);
 
                 loanDetailsList.Add(loanDetails);
             }
@@ -156,20 +168,24 @@ public static class ExcelReader
     }
 
     /// <summary>
-    /// Extracts loan details from a data row
+    /// Extracts loan details from a data row used for xlsx files
     /// </summary>
     /// <param name="dataRow">The data row to extract from</param>
     /// <param name="columnMapping">Column name to position mapping</param>
     /// <param name="fileDetailsId">ID of the file details record</param>
     /// <param name="quarterEndDate">Quarter end date for calculations</param>
     /// <param name="frequency">Frequency type for remaining maturity calculation</param>
+    /// <param name="fileName">The name of the file being processed</param>
+    /// <param name="isLatestPortfolio">True if this file is part of the latest portfolio</param>
     /// <returns>Loan details creation request</returns>
     private static LoanDetailsCreationRequest ExtractLoanDetailsFromRow(
         IXLRow dataRow,
         Dictionary<string, int> columnMapping,
         Guid fileDetailsId,
         DateTime quarterEndDate,
-        FrequencyType frequency)
+        FrequencyType frequency,
+        string fileName,
+        bool isLatestPortfolio)
     {
         // Extract basic data from Excel
         string customerNumber = GetCellValue(dataRow, columnMapping, "Customer Number");
@@ -203,7 +219,7 @@ public static class ExcelReader
         string period = GetCellValue(dataRow, columnMapping, "Period");
 
         // Calculate remaining maturity and bucket label (requires bucket configuration)
-        int remainingMaturityYears = CalculationHelper.CalculateRemainingMaturity(maturityDate, quarterEndDate, frequency);
+        int remainingMaturityYears = CalculationHelper.CalculateRemainingMaturity(maturityDate, quarterEndDate, frequency, fileName, isLatestPortfolio);
         string bucketLabel = "Unknown Bucket"; // TODO: Add bucket configuration parameter
 
         return new LoanDetailsCreationRequest(
@@ -459,13 +475,17 @@ public static class ExcelReader
     /// <param name="fileDetailsId">ID of the file details record</param>
     /// <param name="quarterEndDate">Quarter end date for calculations</param>
     /// <param name="frequency">Frequency type for remaining maturity calculation</param>
+    /// <param name="fileName">The name of the file being processed</param>
+    /// <param name="isLatestPortfolio">True if this file is part of the latest portfolio</param>
     /// <returns>Loan details creation request</returns>
     private static LoanDetailsCreationRequest ExtractLoanDetailsFromCsvRow(
         string[] values,
         Dictionary<string, int> columnMapping,
         Guid fileDetailsId,
         DateTime quarterEndDate,
-        FrequencyType frequency)
+        FrequencyType frequency,
+        string fileName,
+        bool isLatestPortfolio)
     {
         // Extract basic data from CSV
         string customerNumber = GetCsvValue(values, columnMapping, "Customer Number");
@@ -499,7 +519,7 @@ public static class ExcelReader
         string period = GetCsvValue(values, columnMapping, "Period");
 
         // Calculate remaining maturity and bucket label (requires bucket configuration)
-        int remainingMaturityYears = CalculationHelper.CalculateRemainingMaturity(maturityDate, quarterEndDate, frequency);
+        int remainingMaturityYears = CalculationHelper.CalculateRemainingMaturity(maturityDate, quarterEndDate, frequency, fileName, isLatestPortfolio);
         string bucketLabel = "Unknown Bucket"; // TODO: Add bucket configuration parameter
 
         return new LoanDetailsCreationRequest(

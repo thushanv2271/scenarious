@@ -2,6 +2,7 @@
 using Application.Abstractions.Data;
 using Domain.Authentication;
 using Domain.Branches;
+using Domain.Collaterals;
 using Domain.CollectiveImpairment;
 using Domain.Configurations;
 using Domain.EfaConfigs;
@@ -10,6 +11,8 @@ using Domain.FacilityCashFlowTypes;
 using Domain.Files;
 using Domain.IndividualImpairment;
 using Domain.Industries;
+using Domain.LGDCalculation;
+using Domain.LGDProgressTrackings;
 using Domain.MasterData;
 using Domain.Organizations;
 using Domain.PasswordResetTokens;
@@ -57,6 +60,7 @@ public sealed class ApplicationDbContext(
 
     public DbSet<CollectiveImpairmentConfig> CollectiveImpairmentConfigs { get; set; } = null!;
     public DbSet<PDProgressTracking> PDProgressTrackings { get; set; } = null!;
+    public DbSet<LgdProgressTracking> LgdProgressTrackings { get; set; } = null!;
 
     public DbSet<SegmentMaster> SegmentMasters { get; set; } = null!;
 
@@ -66,6 +70,13 @@ public sealed class ApplicationDbContext(
     public DbSet<FileDetails> FileDetails { get; set; } = null!;
     public DbSet<LoanDetails> LoanDetails { get; set; } = null!;
 
+    // LGD Calculation entities
+    public DbSet<LgdFileDetails> LgdFileDetails { get; set; } = null!;
+    public DbSet<LgdDetails> LgdDetails { get; set; } = null!;
+
+    // VC LGD Calculation entities
+    public DbSet<VCLgdFileDetails> VCLgdFileDetails { get; set; } = null!;
+    public DbSet<VCLgdDetails> VCLgdDetails { get; set; } = null!;
 
     public DbSet<EfaConfiguration> EfaConfigurations { get; set; }
     public DbSet<Organization> Organizations { get; set; }
@@ -74,9 +85,11 @@ public sealed class ApplicationDbContext(
     public DbSet<ProductCategory> ProductCategories { get; set; }
     public DbSet<Segment> Segments { get; set; }
     public DbSet<Industry> Industries { get; set; }
+    public DbSet<Collateral> Collaterals { get; set; }
     public DbSet<Scenario> Scenarios { get; set; }
 
     public DbSet<PDAlgorithmResult> PDAlgorithmResults { get; set; }
+    public DbSet<LgdAlgorithmResult> LgdAlgorithmResults { get; set; }
 
     public DbSet<RiskIndicator> RiskIndicators => Set<RiskIndicator>();
     public DbSet<CustomerRiskEvaluation> CustomerRiskEvaluations => Set<CustomerRiskEvaluation>();

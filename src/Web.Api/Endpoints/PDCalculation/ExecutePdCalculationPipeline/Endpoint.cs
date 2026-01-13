@@ -7,6 +7,7 @@ using Application.Models;
 using Application.Models.PDSummary;
 using Domain.PDAlgorithmResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 using Web.Api.Infrastructure;
 
@@ -46,16 +47,20 @@ internal sealed class Endpoint : IEndpoint
 
             try
             {
-                // Get user from context
-                string createdBy = context.User?.Identity?.Name ?? "system";
-
-                // Get user ID from claims
-                var createdByUserId = Guid.Parse("00000000-0000-0000-0000-000000000001"); // Default
-                Claim? userIdClaim = context.User?.FindFirst("sub") ?? context.User?.FindFirst("userId");
-                if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out Guid parsedUserId))
+                // Extract UserId from JWT token claims ...
+                string? userIdString = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrWhiteSpace(userIdString) || !Guid.TryParse(userIdString, out Guid createdByUserId))
                 {
-                    createdByUserId = parsedUserId;
+                    var failure = Result.Failure<PdExtrapolationResultDto>(new Error(
+                        "InvalidToken",
+                        "Invalid token: UserId not found",
+                        ErrorType.Validation
+                    ));
+                    return CustomResults.Problem(failure);
                 }
+
+                // Get user name from context (optional, for logging purposes)
+                string createdBy = context.User?.Identity?.Name ?? "system";
 
                 #region Step 1 - Data Preparation
 
@@ -136,10 +141,34 @@ internal sealed class Endpoint : IEndpoint
 
                 try
                 {
+                    // Check if there are existing records and delete them
+                    bool hasExistingRecords = await dbContext.PDAlgorithmResults.AnyAsync(cancellationToken);
+
+                    if (hasExistingRecords)
+                    {
+                        logger.LogInformation("Existing PD Algorithm Results found. Deleting all existing records...");
+
+                        // Get all existing records
+                        List<PDAlgorithmResult> existingResults = await dbContext.PDAlgorithmResults
+                            .ToListAsync(cancellationToken);
+
+                        int existingCount = existingResults.Count;
+
+                        // Remove all existing records
+                        dbContext.PDAlgorithmResults.RemoveRange(existingResults);
+                        await dbContext.SaveChangesAsync(cancellationToken);
+
+                        logger.LogInformation("Deleted {Count} existing PD Algorithm Result records", existingCount);
+                    }
+                    else
+                    {
+                        logger.LogInformation("No existing PD Algorithm Results found");
+                    }
+
                     // Serialize step4 result to JSON for JSONB storage
                     string pdAlgorithmJson = JsonSerializer.Serialize(step4Result.Value, JsonSerializeOptions);
 
-                    // Create the PD Algorithm Result entity
+                    // Create the PD Algorithm Result entity with the extracted userId
                     var pdAlgorithmResult = PDAlgorithmResult.Create(
                         pdAlgorithmJson,
                         createdByUserId
@@ -150,9 +179,10 @@ internal sealed class Endpoint : IEndpoint
                     await dbContext.SaveChangesAsync(cancellationToken);
 
                     logger.LogInformation(
-                        "PD Algorithm Result saved to database. ID: {Id}, ProductCategories: {Count}",
+                        "PD Algorithm Result saved to database. ID: {Id}, ProductCategories: {Count}, CreatedBy: {UserId}",
                         pdAlgorithmResult.Id,
-                        step4Result.Value.ProductCategories.Count);
+                        step4Result.Value.ProductCategories.Count,
+                        createdByUserId);
                 }
                 catch (Exception saveEx)
                 {
@@ -229,3 +259,5 @@ internal sealed class Endpoint : IEndpoint
         return response;
     }
 }
+
+

@@ -16,9 +16,10 @@ namespace Application.Files.DeleteFile;
 /// Handles the deletion of uploaded files, removing both the physical file and database metadata.
 /// </summary>
 /// <remarks>
-/// This handler performs two critical operations for each file:
-/// 1. Deletes the physical file from the file system
-/// 2. Removes the file metadata from the database
+/// This handler performs critical operations for each file:
+/// 1. Deletes related validation results from the database
+/// 2. Deletes the physical file from the file system
+/// 3. Removes the file metadata from the database
 /// 
 /// If the physical file deletion fails, the operation continues to remove the database record
 /// to prevent orphaned metadata.
@@ -63,6 +64,25 @@ internal sealed class DeleteFileCommandHandler(
                 string.Join(", ", notFoundIds),
                 command.Ids.Count,
                 uploadedFiles.Count);
+        }
+
+        // Get all stored file names for finding related validation results
+        var storedFileNames = uploadedFiles.Select(x => x.StoredFileName).ToList();
+
+        // Find and delete related file validation results
+        List<FileValidationResult> validationResults = await dbContext.FileValidationResults
+            .Where(x => storedFileNames.Contains(x.Filename))
+            .ToListAsync(cancellationToken);
+
+        if (validationResults.Any())
+        {
+            dbContext.FileValidationResults.RemoveRange(validationResults);
+            
+            logger.LogInformation(
+                "Found {ValidationResultCount} validation result(s) to delete for {FileCount} file(s) by user {UserId}",
+                validationResults.Count,
+                uploadedFiles.Count,
+                command.DeletedBy);
         }
 
         // Process each file for deletion

@@ -226,6 +226,9 @@ internal sealed class GetSelectedMethodologiesQueryHandler(
 
     #region JSON Extraction Methods
 
+    /// <summary>
+    /// Extracts ALL methodology data dynamically from the summary
+    /// </summary>
     private static MethodologyDataDto? ExtractMethodologyData(
         JsonElement summaryElement,
         string methodologyName)
@@ -235,10 +238,14 @@ internal sealed class GetSelectedMethodologiesQueryHandler(
             return null;
         }
 
+        // Extract all possible table types dynamically
         return new MethodologyDataDto(
             MarginalPdsAfterEfa: ExtractPdTable(methodElement, "marginalPdsAfterEfa"),
             ExtrapolatedCumulativePdsAfterEfa: ExtractPdTable(methodElement, "extrapolatedCumulativePdsAfterEfa"),
-            ExtrapolatedCumulativePdsBeforeEfa: ExtractPdTable(methodElement, "extrapolatedCumulativePdsBeforeEfa")
+            ExtrapolatedCumulativePdsBeforeEfa: ExtractPdTable(methodElement, "extrapolatedCumulativePdsBeforeEfa"),
+            SurvivalRates: ExtractPdTable(methodElement, "survivalRates"),
+            MarginalPds: ExtractPdTable(methodElement, "marginalPds"),
+            EfaAdjustedPds: ExtractPdTable(methodElement, "efaAdjustedPds")
         );
     }
 
@@ -402,7 +409,10 @@ internal sealed class GetSelectedMethodologiesQueryHandler(
     {
         return MatchesSearchInTable(methodologyData.MarginalPdsAfterEfa, search) ||
                MatchesSearchInTable(methodologyData.ExtrapolatedCumulativePdsAfterEfa, search) ||
-               MatchesSearchInTable(methodologyData.ExtrapolatedCumulativePdsBeforeEfa, search);
+               MatchesSearchInTable(methodologyData.ExtrapolatedCumulativePdsBeforeEfa, search) ||
+               MatchesSearchInTable(methodologyData.SurvivalRates, search) ||
+               MatchesSearchInTable(methodologyData.MarginalPds, search) ||
+               MatchesSearchInTable(methodologyData.EfaAdjustedPds, search);
     }
 
     /// <summary>

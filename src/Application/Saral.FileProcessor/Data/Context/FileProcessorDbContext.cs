@@ -44,6 +44,14 @@ public class FileProcessorDbContext : DbContext
                 .HasColumnName("session_id")
                 .IsRequired();
                 
+            entity.Property(e => e.TimePeriod)
+                .HasColumnName("time_period")
+                .HasMaxLength(50);
+                
+            entity.Property(e => e.CollectiveImpairmentType)
+                .HasColumnName("collective_impairment_type")
+                .HasMaxLength(10);
+                
             entity.Property(e => e.CreatedOnUtc)
                 .HasColumnName("created_on_utc")
                 .HasColumnType("timestamptz")
@@ -62,6 +70,9 @@ public class FileProcessorDbContext : DbContext
                 
             entity.HasIndex(e => e.CreatedOnUtc)
                 .HasDatabaseName("ix_file_validation_results_created_on_utc");
+                
+            entity.HasIndex(e => new { e.TimePeriod, e.CollectiveImpairmentType })
+                .HasDatabaseName("ix_file_validation_results_time_period_type");
         });
     }
 }

@@ -9,4 +9,8 @@ public interface IAppConfiguration
 	string HostingType { get; }
 
 	string PDFilesPath { get; }
+
+	string LGD_ClosedFacilityFilesPath { get; }
+
+	string LGD_OpenFacilityFilesPath { get; }
 }

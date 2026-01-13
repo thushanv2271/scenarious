@@ -60,11 +60,26 @@ public static class FileProcessingUtilities
             var configDoc = JsonDocument.Parse(configJson);
             JsonElement root = configDoc.RootElement;
 
+            // Check if this is an LGD configuration (has lgdFileUpload)
+            if (root.TryGetProperty("lgdFileUpload", out JsonElement lgdFileUpload))
+            {
+                // LGD uses yearly format (YYYY)
+                if (!Regex.IsMatch(timePeriod, @"^\d{4}$"))
+                {
+                    return Result.Failure<string>(Error.Problem(
+                        "TimePeriod.InvalidFormat",
+                        "For LGD, time period must be in format YYYY (e.g., '2025')."));
+                }
+
+                return ValidateLgdTimePeriodRange(timePeriod, lgdFileUpload);
+            }
+
+            // Otherwise, use PD validation (requires pdSetup)
             if (!root.TryGetProperty("pdSetup", out JsonElement pdSetup))
             {
                 return Result.Failure<string>(Error.Problem(
                     "Config.Invalid",
-                    "Configuration does not contain pdSetup section."));
+                    "Configuration does not contain pdSetup or lgdFileUpload section."));
             }
 
             if (!pdSetup.TryGetProperty("frequency", out JsonElement frequencyElement))
@@ -101,6 +116,14 @@ public static class FileProcessingUtilities
             var configDoc = JsonDocument.Parse(configJson);
             JsonElement root = configDoc.RootElement;
 
+            // Check if this is an LGD configuration
+            if (root.TryGetProperty("lgdFileUpload", out _))
+            {
+                // LGD always uses yearly format: parameterFolder/YYYY
+                return Path.Combine(parameterFolder, timePeriod);
+            }
+
+            // PD configuration
             if (!root.TryGetProperty("pdSetup", out JsonElement pdSetup) ||
                 !pdSetup.TryGetProperty("frequency", out JsonElement frequencyElement))
             {
@@ -121,6 +144,44 @@ public static class FileProcessingUtilities
         {
             return Path.Combine(parameterFolder, timePeriod);
         }
+    }
+
+    private static Result<string> ValidateLgdTimePeriodRange(string timePeriod, JsonElement lgdFileUpload)
+    {
+        if (!lgdFileUpload.TryGetProperty("timePeriod", out JsonElement timePeriodConfig))
+        {
+            return Result.Success(timePeriod);
+        }
+
+        if (!timePeriodConfig.TryGetProperty("from", out JsonElement fromElement) ||
+            !timePeriodConfig.TryGetProperty("to", out JsonElement toElement))
+        {
+            return Result.Success(timePeriod);
+        }
+
+        string fromPeriod = fromElement.GetString() ?? "";
+        string toPeriod = toElement.GetString() ?? "";
+
+        // For LGD: from might be greater than to (e.g., from: "2026", to: "2022")
+        // So we need to check both directions
+        if (!int.TryParse(fromPeriod, out int fromYear) || 
+            !int.TryParse(toPeriod, out int toYear) ||
+            !int.TryParse(timePeriod, out int year))
+        {
+            return Result.Success(timePeriod);
+        }
+
+        int minYear = Math.Min(fromYear, toYear);
+        int maxYear = Math.Max(fromYear, toYear);
+
+        if (year < minYear || year > maxYear)
+        {
+            return Result.Failure<string>(Error.Problem(
+                "TimePeriod.OutOfRange",
+                $"Time period '{timePeriod}' is outside the configured range from '{minYear}' to '{maxYear}'."));
+        }
+
+        return Result.Success(timePeriod);
     }
 
     private static Result<string> ValidateYearlyTimePeriod(string timePeriod, JsonElement pdSetup)

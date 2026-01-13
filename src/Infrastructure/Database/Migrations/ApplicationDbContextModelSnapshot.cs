@@ -131,6 +131,37 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("branches", "public");
                 });
 
+            modelBuilder.Entity("Domain.Collaterals.Collateral", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_collaterals");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_collaterals_name");
+
+                    b.ToTable("collaterals", "public");
+                });
+
             modelBuilder.Entity("Domain.CollectiveImpairment.CollectiveImpairmentConfig", b =>
                 {
                     b.Property<Guid>("Id")
@@ -348,6 +379,11 @@ namespace Infrastructure.Database.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CollectiveImpairmentType")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("collective_impairment_type");
+
                     b.Property<DateTime>("CreatedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
@@ -372,6 +408,11 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("status");
 
+                    b.Property<string>("TimePeriod")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("time_period");
+
                     b.Property<int>("TotalErrors")
                         .HasColumnType("integer")
                         .HasColumnName("total_errors");
@@ -382,6 +423,15 @@ namespace Infrastructure.Database.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_file_validation_results");
+
+                    b.HasIndex("Filename")
+                        .HasDatabaseName("ix_file_validation_results_filename");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_file_validation_results_status");
+
+                    b.HasIndex("TimePeriod", "CollectiveImpairmentType")
+                        .HasDatabaseName("ix_file_validation_results_time_period_type");
 
                     b.ToTable("file_validation_results", "public");
                 });
@@ -548,6 +598,596 @@ namespace Infrastructure.Database.Migrations
                         .HasDatabaseName("ix_industries_name");
 
                     b.ToTable("industries", "public");
+                });
+
+            modelBuilder.Entity("Domain.LGDCalculation.LgdAlgorithmResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("LgdAlgorithmResultData")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("lgd_algorithm_result_data");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lgd_algorithm_results");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_lgd_algorithm_results_created_at");
+
+                    b.ToTable("lgd_algorithm_results", "public");
+                });
+
+            modelBuilder.Entity("Domain.LGDCalculation.LgdDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Branch")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("branch");
+
+                    b.Property<string>("BucketingInIndividualAssessment")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("bucketing_in_individual_assessment");
+
+                    b.Property<decimal>("Cashflow")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("cashflow");
+
+                    b.Property<DateTime>("ClosureDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closure_date");
+
+                    b.Property<string>("CollateralType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("collateral_type");
+
+                    b.Property<decimal>("CollateralValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("collateral_value");
+
+                    b.Property<string>("CustomerNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("customer_number");
+
+                    b.Property<int>("DaysPastDue")
+                        .HasColumnType("integer")
+                        .HasColumnName("days_past_due");
+
+                    b.Property<decimal>("Dcf")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("dcf");
+
+                    b.Property<decimal>("DiscountedCashflows")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discounted_cashflows");
+
+                    b.Property<string>("EarningType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("earning_type");
+
+                    b.Property<string>("FacilityNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("facility_number");
+
+                    b.Property<DateTime?>("FirstNplDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_npl_date");
+
+                    b.Property<DateTime>("GrantDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("grant_date");
+
+                    b.Property<bool>("IndividuallyImpaired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("individually_impaired");
+
+                    b.Property<string>("Industry")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("industry");
+
+                    b.Property<string>("InstallmentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("installment_type");
+
+                    b.Property<decimal>("InterestInSuspense")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("interest_in_suspense");
+
+                    b.Property<decimal>("InterestRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("interest_rate");
+
+                    b.Property<Guid>("LgdFileDetailsId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lgd_file_details_id");
+
+                    b.Property<decimal>("Limit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("limit");
+
+                    b.Property<DateTime>("MaturityDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("maturity_date");
+
+                    b.Property<string>("Nature")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("nature");
+
+                    b.Property<int>("NoOfTimesRestructured")
+                        .HasColumnType("integer")
+                        .HasColumnName("no_of_times_restructured");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("period");
+
+                    b.Property<string>("ProductCategory")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("product_category");
+
+                    b.Property<DateTime>("ReceiptDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("receipt_date");
+
+                    b.Property<bool>("Rescheduled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rescheduled");
+
+                    b.Property<bool>("Restructured")
+                        .HasColumnType("boolean")
+                        .HasColumnName("restructured");
+
+                    b.Property<string>("Segment")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("segment");
+
+                    b.Property<decimal>("TotalOS")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_os");
+
+                    b.Property<decimal>("TotalOutstandingAsAtFirstNplDate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_outstanding_as_at_first_npl_date");
+
+                    b.Property<decimal>("UndisbursedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("undisbursed_amount");
+
+                    b.Property<bool>("UpgradedToDelinquencyBucket")
+                        .HasColumnType("boolean")
+                        .HasColumnName("upgraded_to_delinquency_bucket");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lgd_details");
+
+                    b.HasIndex("LgdFileDetailsId")
+                        .HasDatabaseName("ix_lgd_details_lgd_file_details_id");
+
+                    b.ToTable("lgd_details", "public");
+                });
+
+            modelBuilder.Entity("Domain.LGDCalculation.LgdFileDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("Part")
+                        .HasColumnType("integer")
+                        .HasColumnName("part");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("period");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lgd_file_details");
+
+                    b.ToTable("lgd_file_details", "public");
+                });
+
+            modelBuilder.Entity("Domain.LGDCalculation.VCLgdDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Branch")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("branch");
+
+                    b.Property<string>("BucketingInIndividualAssessment")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("bucketing_in_individual_assessment");
+
+                    b.Property<decimal>("Cashflow")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("cashflow");
+
+                    b.Property<DateTime>("ClosureDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closure_date");
+
+                    b.Property<string>("CollateralType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("collateral_type");
+
+                    b.Property<decimal>("CollateralValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("collateral_value");
+
+                    b.Property<string>("CustomerNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("customer_number");
+
+                    b.Property<int>("DPD")
+                        .HasColumnType("integer")
+                        .HasColumnName("dpd");
+
+                    b.Property<int>("DaysPastDue")
+                        .HasColumnType("integer")
+                        .HasColumnName("days_past_due");
+
+                    b.Property<decimal>("Dcf")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("dcf");
+
+                    b.Property<decimal>("DiscountedCashflows")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discounted_cashflows");
+
+                    b.Property<string>("EarningType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("earning_type");
+
+                    b.Property<string>("FacilityNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("facility_number");
+
+                    b.Property<DateTime?>("FirstNplDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_npl_date");
+
+                    b.Property<DateTime>("GrantDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("grant_date");
+
+                    b.Property<bool>("IndividuallyImpaired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("individually_impaired");
+
+                    b.Property<string>("Industry")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("industry");
+
+                    b.Property<string>("InstallmentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("installment_type");
+
+                    b.Property<decimal>("InterestInSuspense")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("interest_in_suspense");
+
+                    b.Property<decimal>("InterestRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("interest_rate");
+
+                    b.Property<decimal>("Limit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("limit");
+
+                    b.Property<DateTime>("MaturityDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("maturity_date");
+
+                    b.Property<string>("Nature")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("nature");
+
+                    b.Property<int>("NoOfTimesRestructured")
+                        .HasColumnType("integer")
+                        .HasColumnName("no_of_times_restructured");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("period");
+
+                    b.Property<string>("ProductCategory")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("product_category");
+
+                    b.Property<DateTime>("ReceiptDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("receipt_date");
+
+                    b.Property<bool>("Rescheduled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rescheduled");
+
+                    b.Property<bool>("Restructured")
+                        .HasColumnType("boolean")
+                        .HasColumnName("restructured");
+
+                    b.Property<string>("Segment")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("segment");
+
+                    b.Property<decimal>("TotalOS")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_os");
+
+                    b.Property<decimal>("TotalOutstandingAsAtFirstNplDate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_outstanding_as_at_first_npl_date");
+
+                    b.Property<decimal>("UndisbursedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("undisbursed_amount");
+
+                    b.Property<bool>("UpgradedToDelinquencyBucket")
+                        .HasColumnType("boolean")
+                        .HasColumnName("upgraded_to_delinquency_bucket");
+
+                    b.Property<Guid>("VCLgdFileDetailsId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vc_lgd_file_details_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_vc_lgd_details");
+
+                    b.HasIndex("VCLgdFileDetailsId")
+                        .HasDatabaseName("ix_vc_lgd_details_vc_lgd_file_details_id");
+
+                    b.ToTable("vc_lgd_details", "public");
+                });
+
+            modelBuilder.Entity("Domain.LGDCalculation.VCLgdFileDetails", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("Part")
+                        .HasColumnType("integer")
+                        .HasColumnName("part");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("period");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id")
+                        .HasName("pk_vc_lgd_file_details");
+
+                    b.ToTable("vc_lgd_file_details", "public");
+                });
+
+            modelBuilder.Entity("Domain.LGDProgressTrackings.LgdProgressTracking", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("message");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StepName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("step_name");
+
+                    b.Property<int>("StepOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("step_order");
+
+                    b.Property<string>("SubTaskName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sub_task_name");
+
+                    b.Property<int>("SubTaskOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sub_task_order");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lgd_progress_tracking");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_lgd_progress_tracking_is_active");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_lgd_progress_tracking_session_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_lgd_progress_tracking_status");
+
+                    b.HasIndex("SessionId", "StepOrder", "SubTaskOrder")
+                        .HasDatabaseName("ix_lgd_progress_tracking_session_step_subtask");
+
+                    b.ToTable("lgd_progress_tracking", "public");
                 });
 
             modelBuilder.Entity("Domain.MasterData.SegmentMaster", b =>
@@ -1668,6 +2308,30 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_facility_cash_flow_types_segments");
                 });
 
+            modelBuilder.Entity("Domain.LGDCalculation.LgdDetails", b =>
+                {
+                    b.HasOne("Domain.LGDCalculation.LgdFileDetails", "LgdFileDetails")
+                        .WithMany("LgdDetails")
+                        .HasForeignKey("LgdFileDetailsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_lgd_details_lgd_file_details_lgd_file_details_id");
+
+                    b.Navigation("LgdFileDetails");
+                });
+
+            modelBuilder.Entity("Domain.LGDCalculation.VCLgdDetails", b =>
+                {
+                    b.HasOne("Domain.LGDCalculation.VCLgdFileDetails", "VCLgdFileDetails")
+                        .WithMany("VCLgdDetails")
+                        .HasForeignKey("VCLgdFileDetailsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_vc_lgd_details_vc_lgd_file_details_vc_lgd_file_details_id");
+
+                    b.Navigation("VCLgdFileDetails");
+                });
+
             modelBuilder.Entity("Domain.PDCalculation.LoanDetails", b =>
                 {
                     b.HasOne("Domain.PDCalculation.FileDetails", "FileDetails")
@@ -1794,6 +2458,16 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_users_branches_branch_id");
 
                     b.Navigation("Branch");
+                });
+
+            modelBuilder.Entity("Domain.LGDCalculation.LgdFileDetails", b =>
+                {
+                    b.Navigation("LgdDetails");
+                });
+
+            modelBuilder.Entity("Domain.LGDCalculation.VCLgdFileDetails", b =>
+                {
+                    b.Navigation("VCLgdDetails");
                 });
 
             modelBuilder.Entity("Domain.PDCalculation.FileDetails", b =>

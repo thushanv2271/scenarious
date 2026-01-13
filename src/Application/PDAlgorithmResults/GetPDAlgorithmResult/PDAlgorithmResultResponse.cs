@@ -54,18 +54,20 @@ public sealed record SegmentData
 }
 
 /// <summary>
-/// Summary containing method calculations only
+/// Summary containing method calculations dynamically
+/// Uses JsonExtensionData to capture any methodology (method1, method2, method3, etc.) 
+/// from the database without hardcoding property names
 /// </summary>
 public sealed record SegmentSummary
 {
-    [JsonPropertyName("method1")]
-    public MethodData? Method1 { get; init; }
-
-    [JsonPropertyName("method2")]
-    public MethodData? Method2 { get; init; }
-
-    [JsonPropertyName("method3")]
-    public MethodData? Method3 { get; init; }
+    /// <summary>
+    /// Dictionary of methodologies with their associated data
+    /// Dynamically populated from JSON - supports any methodology name
+    /// Key: methodology name (e.g., "method1", "method2", "method3")
+    /// Value: methodology data containing PD tables
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, object?> Methods { get; init; } = new();
 }
 
 /// <summary>

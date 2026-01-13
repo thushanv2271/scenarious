@@ -20,4 +20,16 @@ public sealed class ProcessedFilePathsOptions
     /// </summary>
     [Required]
     public string LGD { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Path for successfully processed LGD Open Facility files.
+    /// </summary>
+    [Required]
+    public string LGD_OpenFacility { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Path for successfully processed LGD Closed Facility files.
+    /// </summary>
+    [Required]
+    public string LGD_ClosedFacility { get; set; } = string.Empty;
 }

@@ -12,12 +12,12 @@ public sealed class UploadedFile
     public Guid Id { get; init; } = Guid.NewGuid();
 
     public required string OriginalFileName { get; init; }
-    public required string StoredFileName { get; init; }
+    public required string StoredFileName { get; set; }
     public required string ContentType { get; init; }
     public long Size { get; init; }
 
-    public required string PhysicalPath { get; init; }
-    public required string PublicUrl { get; init; }
+    public required string PhysicalPath { get; set; }
+    public required string PublicUrl { get; set; }
 
     public Guid UploadedBy { get; init; }
     public DateTimeOffset UploadedAt { get; init; } = DateTimeOffset.UtcNow;

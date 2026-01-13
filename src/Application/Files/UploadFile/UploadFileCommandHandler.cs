@@ -126,8 +126,8 @@ internal sealed class UploadFileCommandHandler(
             ? expandedRoot
             : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, expandedRoot));
 
-        string parameterFolder = Path.Combine(rootPath, parameterType.ToString());
-        
+        string parameterFolder = Path.Combine(rootPath, parameterType.ToString(), "pending");
+
         // Create hierarchical folder structure based on frequency
         string timePeriodFolder = FileProcessingUtilities.CreateTimePeriodFolderPath(parameterFolder, command.TimePeriod, config.ConfigJson);
 
@@ -195,7 +195,7 @@ internal sealed class UploadFileCommandHandler(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation("Uploaded {FileCount} files by {UserId} to '{Location}' with total size {TotalSize} bytes", 
+        logger.LogInformation("Uploaded {FileCount} files by {UserId} to '{Location}' with total size {TotalSize} bytes",
             command.Files.Count, command.UploadedBy, timePeriodFolder, totalSize);
 
         var response = new UploadFileResponse(

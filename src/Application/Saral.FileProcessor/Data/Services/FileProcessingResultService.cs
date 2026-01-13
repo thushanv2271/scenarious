@@ -9,7 +9,13 @@ public class FileProcessingResultService : IFileProcessingResultService
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<int> SaveFileValidationResultAsync(AnalysisResult analysisResult, string filename, Guid sessionId, CancellationToken cancellationToken = default)
+    public async Task<int> SaveFileValidationResultAsync(
+        AnalysisResult analysisResult, 
+        string filename, 
+        Guid sessionId, 
+        string? timePeriod = null,
+        string? collectiveImpairmentType = null,
+        CancellationToken cancellationToken = default)
     {
         var entity = new FileValidationResult
         {
@@ -18,6 +24,8 @@ public class FileProcessingResultService : IFileProcessingResultService
             TotalErrors = analysisResult.ValidationSummary?.RowValidations.Count(r => !r.IsValid) ?? 0,
             Status = DetermineStatus(analysisResult),
             SessionId = sessionId,
+            TimePeriod = timePeriod,
+            CollectiveImpairmentType = collectiveImpairmentType,
             CreatedOnUtc = DateTime.UtcNow
         };
 
@@ -27,7 +35,12 @@ public class FileProcessingResultService : IFileProcessingResultService
         return entity.Id;
     }
 
-    public async Task<List<int>> SaveMultiFileProcessingResultAsync(MultiFileAnalysisResult analysisResult, string sessionId, CancellationToken cancellationToken = default)
+    public async Task<List<int>> SaveMultiFileProcessingResultAsync(
+        MultiFileAnalysisResult analysisResult, 
+        string sessionId,
+        string? timePeriod = null,
+        string? collectiveImpairmentType = null,
+        CancellationToken cancellationToken = default)
     {
         var fileResultIds = new List<int>();
         
@@ -35,7 +48,13 @@ public class FileProcessingResultService : IFileProcessingResultService
         foreach (IndividualFileResult individualResult in analysisResult.IndividualResults)
         {
             var sessionGuid = Guid.Parse(sessionId);
-            int fileResultId = await SaveFileValidationResultAsync(individualResult.Analysis, individualResult.FileName, sessionGuid, cancellationToken);
+            int fileResultId = await SaveFileValidationResultAsync(
+                individualResult.Analysis, 
+                individualResult.FileName, 
+                sessionGuid,
+                timePeriod,
+                collectiveImpairmentType,
+                cancellationToken);
             fileResultIds.Add(fileResultId);
         }
         

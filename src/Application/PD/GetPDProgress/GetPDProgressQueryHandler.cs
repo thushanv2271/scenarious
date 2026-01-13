@@ -55,7 +55,9 @@ internal sealed class GetPDProgressQueryHandler(
             ProgressData: dtos,
             IsNewlyCreated: false,
             IsRerun: true,
-            SessionId: newRecords[0].SessionId
+            SessionId: newRecords[0].SessionId,
+            IsComplete: false,
+            IsError: false
         );
         return Result.Success(response);
     }
@@ -74,13 +76,17 @@ internal sealed class GetPDProgressQueryHandler(
         if (existingRecords.Any())
         {
             bool isNewlyCreated = existingRecords.All(r => r.Status == PDProgressStatus.Pending);
+            bool isComplete = existingRecords.All(r => r.Status == PDProgressStatus.Completed);
+            bool isError = existingRecords.Any(r => r.Status == PDProgressStatus.Error);
             
             IReadOnlyList<PDProgressDto> existingDtos = existingRecords.Select(MapToDto).ToList();
             GetPDProgressResponse response = new(
                 ProgressData: existingDtos,
                 IsNewlyCreated: isNewlyCreated,
                 IsRerun: false,
-                SessionId: existingRecords[0].SessionId
+                SessionId: existingRecords[0].SessionId,
+                IsComplete: isComplete,
+                IsError: isError
             );
             return Result.Success(response);
         }
@@ -95,7 +101,9 @@ internal sealed class GetPDProgressQueryHandler(
             ProgressData: newDtos,
             IsNewlyCreated: true,
             IsRerun: false,
-            SessionId: newRecords[0].SessionId
+            SessionId: newRecords[0].SessionId,
+            IsComplete: false,
+            IsError: false
         );
         return Result.Success(newResponse);
     }
@@ -136,6 +144,12 @@ internal sealed class GetPDProgressQueryHandler(
 
     private static PDProgressDto MapToDto(PDProgressTracking entity)
     {
+        string status = entity.Status switch
+        {
+            PDProgressStatus.Failed => "error",
+            _ => entity.Status.ToString()
+        };
+
         return new PDProgressDto(
             Id: entity.Id,
             SessionId: entity.SessionId,
@@ -144,7 +158,7 @@ internal sealed class GetPDProgressQueryHandler(
             SubTaskName: entity.SubTaskName,
             SubTaskOrder: entity.SubTaskOrder,
             IsActive: entity.IsActive,
-            Status: entity.Status.ToString(),
+            Status: status,
             Message: entity.Message,
             CreatedAt: entity.CreatedAt,
             CreatedBy: entity.CreatedBy

@@ -39,8 +39,6 @@ public sealed class DatabaseSeeder(
         await SeedBranchesAsync(cancellationToken);
         await SeedAdministratorRoleAndUserAsync(cancellationToken);
         await SeedSegmentMasterAsync(cancellationToken);
-        await SeedProductCategoriesAsync(cancellationToken);
-        await SeedSegmentsAsync(cancellationToken);
         await SeedRiskIndicatorsAsync(cancellationToken);
 
         logger.LogInformation("Database seeding completed successfully.");
@@ -284,115 +282,7 @@ public sealed class DatabaseSeeder(
         logger.LogInformation("Seeded {Count} Organizations.", organizations.Count);
     }
 
-    #region Product Categories Seeding
-
-    private async Task SeedProductCategoriesAsync(CancellationToken cancellationToken)
-    {
-        logger.LogInformation("Seeding Product Categories...");
-
-        string[] categoriesToSeed = new[]
-        {
-        "Housing Loan",
-        "Personal Loan",
-        "Term Loan"
-    };
-
-        foreach (string categoryName in categoriesToSeed)
-        {
-            bool exists = await context.ProductCategories
-                .AnyAsync(pc => pc.Name == categoryName, cancellationToken);
-
-            if (!exists)
-            {
-                var category = new ProductCategory
-                {
-                    Id = Guid.CreateVersion7(),
-                    Name = categoryName,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-
-                context.ProductCategories.Add(category);
-                logger.LogInformation("Created Product Category: {Name}", categoryName);
-            }
-            else
-            {
-                logger.LogInformation("Product Category '{Name}' already exists, skipping.", categoryName);
-            }
-        }
-
-        await context.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Product Categories seeding completed.");
-    }
-
-    #endregion
-
-    #region Segments Seeding
-
-    private async Task SeedSegmentsAsync(CancellationToken cancellationToken)
-    {
-        logger.LogInformation("Seeding Segments...");
-
-        // Get all product categories
-        List<ProductCategory> productCategories = await context.ProductCategories
-            .ToListAsync(cancellationToken);
-
-        if (productCategories.Count == 0)
-        {
-            logger.LogWarning("No Product Categories found. Cannot seed Segments.");
-            return;
-        }
-
-        string[] segmentNames = new[] { "3 Year Loan", "5 Year Loan", "7 Year Loan" };
-        int segmentsCreated = 0;
-
-        foreach (ProductCategory category in productCategories)
-        {
-            foreach (string segmentName in segmentNames)
-            {
-                // Check if this specific combination already exists
-                bool exists = await context.Segments
-                    .AnyAsync(s => s.ProductCategoryId == category.Id && s.Name == segmentName,
-                        cancellationToken);
-
-                if (!exists)
-                {
-                    var segment = new Segment
-                    {
-                        Id = Guid.CreateVersion7(),
-                        ProductCategoryId = category.Id,
-                        Name = segmentName,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-
-                    context.Segments.Add(segment);
-                    segmentsCreated++;
-                    logger.LogInformation("Created Segment: {SegmentName} for {CategoryName}",
-                        segmentName, category.Name);
-                }
-                else
-                {
-                    logger.LogInformation("Segment '{SegmentName}' for '{CategoryName}' already exists, skipping.",
-                        segmentName, category.Name);
-                }
-            }
-        }
-
-        if (segmentsCreated > 0)
-        {
-            await context.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Seeded {Count} new Segments.", segmentsCreated);
-        }
-        else
-        {
-            logger.LogInformation("All Segments already exist, no new segments created.");
-        }
-    }
-
-    #endregion
-
-
+   
     private async Task SeedRiskIndicatorsAsync(CancellationToken cancellationToken)
     {
         logger.LogInformation("Seeding Risk Indicators...");
@@ -578,8 +468,6 @@ public sealed class DatabaseSeeder(
 
         logger.LogInformation("? Seeded {Count} Risk Indicators successfully.", indicators.Count);
     }
-
-
 
 
     //Seed Branches Data  

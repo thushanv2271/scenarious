@@ -45,6 +45,12 @@ public static class PermissionRegistry
         Category = "PD",
         CategoryName = "PD"
     };
+    
+    public static readonly CategoryInfo LGD = new CategoryInfo //LGD related permissions
+    {
+        Category = "LGD",
+        CategoryName = "LGD"
+    };
 
     public static readonly CategoryInfo CategoryEclAnalysis = new CategoryInfo //ECL Analysis permissions
     {
@@ -84,6 +90,8 @@ public static class PermissionRegistry
     public const string AdminSettingsRolePermissionCreate = "Admin.Settings.RolePermission.Create";
 
     public const string PDSetupAccess = "PD.Setup.Create";
+    
+    public const string LGDSetupAccess = "LGD.Setup.Create";
 
     //ECL Analysis
     public const string EclAnalysisAccess = "EclAnalysis.Access";
@@ -128,6 +136,9 @@ public static class PermissionRegistry
 
             //** PD
             new(PDSetupAccess, "PD Setup Access", PD.Category, PD.CategoryName, "Access to PD setup functionalities"),
+            
+            //** LGD
+            new(LGDSetupAccess, "LGD Setup Access", LGD.Category, LGD.CategoryName, "Access to LGD setup functionalities"),
 
             //** ECL Analysis
             new(EclAnalysisAccess, "Access ECL Analysis", CategoryEclAnalysis.Category, CategoryEclAnalysis.CategoryName, "Allows access to ECL Analysis module"),

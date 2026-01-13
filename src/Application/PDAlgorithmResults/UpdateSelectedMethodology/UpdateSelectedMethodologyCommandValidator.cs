@@ -1,16 +1,14 @@
-﻿
-using FluentValidation;
+﻿using FluentValidation;
 
 namespace Application.PDAlgorithmResults.UpdateSelectedMethodology;
 
 /// <summary>
 /// Validator for UpdateSelectedMethodologyCommand
+/// Note: Methodology validation is performed in the handler against actual available methods in the database
 /// </summary>
 internal sealed class UpdateSelectedMethodologyCommandValidator
     : AbstractValidator<UpdateSelectedMethodologyCommand>
 {
-    private static readonly string[] ValidMethodologies = { "method1", "method2", "method3" };
-
     public UpdateSelectedMethodologyCommandValidator()
     {
         RuleFor(x => x.Id)
@@ -32,12 +30,7 @@ internal sealed class UpdateSelectedMethodologyCommandValidator
         RuleFor(x => x.SelectedMethodology)
             .NotEmpty()
             .WithMessage("Selected methodology is required")
-            .Must(BeValidMethodology)
-            .WithMessage("Selected methodology must be one of: method1, method2, method3");
-    }
-
-    private static bool BeValidMethodology(string methodology)
-    {
-        return ValidMethodologies.Contains(methodology, StringComparer.OrdinalIgnoreCase);
+            .MaximumLength(50)
+            .WithMessage("Selected methodology cannot exceed 50 characters");
     }
 }

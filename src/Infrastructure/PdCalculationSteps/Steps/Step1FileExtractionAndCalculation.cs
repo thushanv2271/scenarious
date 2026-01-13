@@ -1,5 +1,5 @@
-using Application.Abstractions.Configuration;
 using Application.Abstractions.Data;
+using Application.Files.Common;
 using Application.Models;
 using Domain.PDCalculation;
 using Infrastructure.PDCalculationSteps.Helpers;
@@ -7,6 +7,7 @@ using SharedKernel;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure.PDCalculationSteps.Steps;
 
@@ -15,21 +16,21 @@ namespace Infrastructure.PDCalculationSteps.Steps;
 /// </summary>
 public class Step1FileExtractionAndCalculation
 {
-    private readonly IAppConfiguration _appConfiguration;
     private readonly IApplicationDbContext _dbContext;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<Step1FileExtractionAndCalculation> _logger;
+    private readonly ProcessedFilePathsOptions _processedFilePathsOptions;
 
     public Step1FileExtractionAndCalculation(
-        IAppConfiguration appConfiguration,
         IApplicationDbContext dbContext,
         IServiceProvider serviceProvider,
-        ILogger<Step1FileExtractionAndCalculation> logger)
+        ILogger<Step1FileExtractionAndCalculation> logger,
+        IOptions<ProcessedFilePathsOptions> processedFilePathsOptions)
     {
-        _appConfiguration = appConfiguration;
         _dbContext = dbContext;
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _processedFilePathsOptions = processedFilePathsOptions.Value;
     }
 
     /// <summary>
@@ -55,8 +56,8 @@ public class Step1FileExtractionAndCalculation
 
         try
         {
-            // Construct file path based on type or use full configuration path
-            string pdFilesPath = PDFilePathHelper.GetPDFilesPath(_appConfiguration, type);
+            // Construct file path based on type or use processed files path
+            string pdFilesPath = PDFilePathHelper.GetPDFilesPath(_processedFilePathsOptions, type);
 
             if (!string.IsNullOrWhiteSpace(type))
             {
@@ -70,17 +71,33 @@ public class Step1FileExtractionAndCalculation
                     $"PD files directory not found: {pdFilesPath}"));
             }
 
-            // Get all CSV files in the directory
-            string[] csvFiles = Directory.GetFiles(pdFilesPath, "*.csv");
+            // Get all CSV files in the directory (support both .csv and .CSV extensions)
+            // Use case-insensitive search and remove duplicates to avoid processing the same file twice
+            var csvFiles = Directory.GetFiles(pdFilesPath, "*.csv", SearchOption.TopDirectoryOnly)
+                .Concat(Directory.GetFiles(pdFilesPath, "*.CSV", SearchOption.TopDirectoryOnly))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-            if (csvFiles.Length == 0)
+            if (csvFiles.Count == 0)
             {
                 return Result.Failure(Error.NotFound(
                     "PDFiles.NoFilesFound",
                     $"No CSV files found in directory: {pdFilesPath}"));
             }
 
-            _logger.LogDebug("Processing {CsvFileCount} CSV files...", csvFiles.Length);
+            // Log the list of all available filenames
+            var fileNames = csvFiles.Select(Path.GetFileName).ToList();
+            _logger.LogInformation("Available files for processing: [{Files}]", string.Join(", ", fileNames));
+
+            // Determine frequency from the first file (assuming all files have same frequency pattern)
+            string? firstFileName = fileNames.FirstOrDefault();
+            FrequencyType inferredFrequency = InferFrequencyFromFileName(firstFileName ?? "");
+
+            // Identify latest portfolio files
+            List<string> latestPortfolioFiles = PortfolioHelper.GetLatestPortfolioFiles(csvFiles, inferredFrequency);
+            _logger.LogInformation("Latest portfolio files identified: [{LatestFiles}]", string.Join(", ", latestPortfolioFiles));
+
+            _logger.LogDebug("Processing {CsvFileCount} CSV files...", csvFiles.Count);
 
             // ==== STEP 1: LOAD CSV FILE DATA ====
             var loadDataStopwatch = Stopwatch.StartNew();
@@ -90,8 +107,11 @@ public class Step1FileExtractionAndCalculation
 
             foreach (string filePath in csvFiles)
             {
+                string currentFileName = Path.GetFileName(filePath) ?? "";
+                bool isLatestPortfolio = PortfolioHelper.IsLatestPortfolioFile(currentFileName, latestPortfolioFiles);
+
                 Result<(FileDetails fileDetails, List<LoanDetails> loanDetails)> processingResult =
-                    ProcessFileInMemory(filePath, quarterEndedDates, datePassedDueBuckets, createdBy);
+                    ProcessFileInMemory(filePath, quarterEndedDates, datePassedDueBuckets, createdBy, isLatestPortfolio);
 
                 if (processingResult.IsFailure)
                 {
@@ -145,12 +165,14 @@ public class Step1FileExtractionAndCalculation
     /// <param name="quarterEndedDates">Quarter ended dates mapping</param>
     /// <param name="datePassedDueBuckets">List of date passed due bucket configurations</param>
     /// <param name="createdBy">User who initiated the process</param>
+    /// <param name="isLatestPortfolio">True if this file is part of the latest portfolio</param>
     /// <returns>Result containing FileDetails and LoanDetails</returns>
     private static Result<(FileDetails fileDetails, List<LoanDetails> loanDetails)> ProcessFileInMemory(
         string filePath,
         Dictionary<string, DateTime> quarterEndedDates,
-        List<Application.Models.DatePassedDueBucket> datePassedDueBuckets,
-        string createdBy)
+        List<DatePassedDueBucket> datePassedDueBuckets,
+        string createdBy,
+        bool isLatestPortfolio)
     {
         string fileName = Path.GetFileName(filePath);
         // Note: This method is static so cannot use instance logger directly
@@ -204,7 +226,9 @@ public class Step1FileExtractionAndCalculation
                 fileDetails.Id,
                 quarterEndedDate,
                 fileNameInfo.Frequency,
-                datePassedDueBuckets);
+                datePassedDueBuckets,
+                fileName,
+                isLatestPortfolio);
         }
         catch (Exception ex)
         {
@@ -478,5 +502,33 @@ public class Step1FileExtractionAndCalculation
             // Placeholder for actual bucket identification
             _ = loan;
         }
+    }
+
+    /// <summary>
+    /// Infers frequency type from filename pattern
+    /// </summary>
+    /// <param name="fileName">The filename to analyze</param>
+    /// <returns>Inferred frequency type</returns>
+    private static FrequencyType InferFrequencyFromFileName(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return FrequencyType.Yearly; // Default fallback
+        }
+
+        // Check for quarterly pattern (PD_YYYYQX_XX)
+        if (System.Text.RegularExpressions.Regex.IsMatch(fileName, @"PD_\d{4}Q[1-4]_\d{2}", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            return FrequencyType.Quarterly;
+        }
+
+        // Check for monthly pattern (PD_YYYY-MM_XX)
+        if (System.Text.RegularExpressions.Regex.IsMatch(fileName, @"PD_\d{4}-\d{2}_\d{2}", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            return FrequencyType.Monthly;
+        }
+
+        // Default to yearly (PD_YYYY_XX)
+        return FrequencyType.Yearly;
     }
 }

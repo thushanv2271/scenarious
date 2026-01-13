@@ -31,8 +31,6 @@ internal sealed class RefreshToken : IEndpoint
 				CustomResults.Problem
 			);
 		})
-		.RequireAuthorization()
-		.HasPermission(PermissionRegistry.UsersAccess)
 		.WithTags(Tags.Users);
 	}
 }

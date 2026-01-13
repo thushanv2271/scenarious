@@ -38,6 +38,7 @@ public static class DependencyInjection
 
         // Register PDSetupConfigurationService
         services.AddScoped<IPDSetupConfigurationService, PDSetupConfigurationService>();
+        
         // Register specific handlers
         services.AddScoped<ProductCategories.UploadProductCategoriesAndSegmentsHandler>();
         services.AddScoped<ProductCategories.SearchProductCategoriesAndSegmentsHandler>();

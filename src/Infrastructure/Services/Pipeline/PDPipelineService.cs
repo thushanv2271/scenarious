@@ -106,7 +106,7 @@ internal sealed class PDPipelineService : IPDPipelineService
             config.DatePassedDueBuckets,
             config.FinalBucketPayload,
             createdBy,
-            config.Type,
+            null,
             cancellationToken);
 
             step1Stopwatch.Stop();

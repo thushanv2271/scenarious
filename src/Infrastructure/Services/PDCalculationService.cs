@@ -1,17 +1,19 @@
+using System.Data;
 using Application.Abstractions.Calculations;
-using Application.Abstractions.Configuration;
 using Application.Abstractions.Data;
-using Application.Models;
 using Application.DTOs.PD;
+using Application.Models;
+using Application.Files.Common;
 using Application.Services;
+using Domain.PDCalculation;
 using Infrastructure.PDCalculationSteps.Steps;
 using Infrastructure.PDCalculationSteps.Steps.Summary;
-using Microsoft.Extensions.DependencyInjection;
-using AppMigrationMatrix = Application.DTOs.PD.MigrationMatrix;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SharedKernel;
-using Domain.PDCalculation;
+using AppMigrationMatrix = Application.DTOs.PD.MigrationMatrix;
 
 namespace Infrastructure.Services;
 
@@ -20,21 +22,21 @@ namespace Infrastructure.Services;
 /// </summary>
 public class PDCalculationService : IPDCalculationService
 {
-    private readonly IAppConfiguration _appConfiguration;
     private readonly IApplicationDbContext _dbContext;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IServiceProvider _serviceProvider;
+    private readonly ProcessedFilePathsOptions _processedFilePathsOptions;
 
     public PDCalculationService(
-        IAppConfiguration appConfiguration,
         IApplicationDbContext dbContext,
         ILoggerFactory loggerFactory,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IOptions<ProcessedFilePathsOptions> processedFilePathsOptions)
     {
-        _appConfiguration = appConfiguration;
         _dbContext = dbContext;
         _loggerFactory = loggerFactory;
         _serviceProvider = serviceProvider;
+        _processedFilePathsOptions = processedFilePathsOptions.Value;
     }
 
     /// <summary>
@@ -142,7 +144,7 @@ public class PDCalculationService : IPDCalculationService
         // Create the appropriate logger for Step1FileExtractionAndCalculation
         ILogger<Step1FileExtractionAndCalculation> step1Logger = _loggerFactory.CreateLogger<Step1FileExtractionAndCalculation>();
 
-        Step1FileExtractionAndCalculation step1 = new(_appConfiguration, _dbContext, _serviceProvider, step1Logger);
+        Step1FileExtractionAndCalculation step1 = new(_dbContext, _serviceProvider, step1Logger, Microsoft.Extensions.Options.Options.Create(_processedFilePathsOptions));
         return await step1.ExecuteAsync(quarterEndedDates, datePassedDueBuckets, finalBucketPayload, createdBy, type, cancellationToken);
     }
 
@@ -174,6 +176,23 @@ public class PDCalculationService : IPDCalculationService
 
         Step2GenerateMigrationMatrices step2 = new(_dbContext, pdSetupConfigurationService, step2Logger, timeConfig, datePassedDueBuckets, pdConfiguration);
         return await step2.ExecuteAsync(createdBy, cancellationToken);
+    }
+
+    public async Task<Result<IReadOnlyList<PdMigrationDataset>>> GetStep2DatasetAsync(
+        TimeConfig timeConfig,
+        List<DatePassedDueBucket> datePassedDueBuckets,
+        List<PDConfiguration> pdConfiguration,
+        CancellationToken cancellationToken = default)
+    {
+        // Create the appropriate logger for Step2GenerateMigrationMatrices
+        ILogger<Step2GenerateMigrationMatrices> step2Logger = _loggerFactory.CreateLogger<Step2GenerateMigrationMatrices>();
+
+        // Get the PDSetupConfigurationService from the service provider
+        IPDSetupConfigurationService pdSetupConfigurationService = _serviceProvider.GetRequiredService<IPDSetupConfigurationService>();
+
+        Step2GenerateMigrationMatrices step2 = new(_dbContext, pdSetupConfigurationService, step2Logger, timeConfig, datePassedDueBuckets, pdConfiguration);
+        IReadOnlyList<PdMigrationDataset> dataset = await step2.PrepareDatasetForMigrationMatrixAsync(cancellationToken);
+        return Result.Success(dataset);
     }
 
     /// <summary>

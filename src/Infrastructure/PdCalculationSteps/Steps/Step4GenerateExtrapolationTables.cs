@@ -641,11 +641,14 @@ internal sealed class Step4GenerateExtrapolationTables
                 PdValuesByYear = new Dictionary<int, decimal?>()
             };
 
+            // Year 1 → base interpolated PD
+            pdRow.PdValuesByYear[1] = interpolatedPd;
+
             // Special handling for first two buckets (Current and 1-30 days)
             if (currentBucket == 1 || currentBucket == 2)
             {
                 // For first two buckets, set all years to null (extrapolation not applied)
-                for (int year = 1; year <= maxMaturity; year++)
+                for (int year = 2; year <= maxMaturity; year++)
                 {
                     pdRow.PdValuesByYear[year] = null;
                 }

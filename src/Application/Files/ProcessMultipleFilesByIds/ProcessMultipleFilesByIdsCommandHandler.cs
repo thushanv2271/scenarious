@@ -121,7 +121,9 @@ internal sealed class ProcessMultipleFilesByIdsCommandHandler(
                 fileProcessingResultService,
                 files,
                 sessionId.ToString(),
-                null, 
+                command.TimePeriod,                      // Pass time period
+                parameterType.ToString(),                // Pass collective impairment type
+                null,  // options
                 cancellationToken);
             logger.LogInformation("ProcessMultipleFilesByIds FileProcessor completed, individual results count: {ResultCount}", analysisResult.IndividualResults.Count);
 
@@ -182,7 +184,7 @@ internal sealed class ProcessMultipleFilesByIdsCommandHandler(
 
             // Determine if processing was successful (no critical errors)
             bool processingSuccessful = crossFileValidationErrors == 0 && 
-                                      individualResults.All(r => r.ValidationSuccessRate >= 95.0); // 95% threshold for success
+                          individualResults.All(r => r.ValidationSuccessRate >= 100.0); // 100% threshold for success
 
             // Handle files based on processing success
             string? fileMovementErrors = null;
@@ -220,6 +222,38 @@ internal sealed class ProcessMultipleFilesByIdsCommandHandler(
                             else
                             {
                                 logger.LogInformation("ProcessMultipleFilesByIds successfully moved {TotalFiles} files", movementResult.Value.TotalFiles);
+                                
+                                // Update UploadedFile entities with new PhysicalPath after successful move
+                                foreach (KeyValuePair<string, string> movedFile in movementResult.Value.MovedFiles)
+                                {
+                                    string oldPath = movedFile.Key;
+                                    string newPath = movedFile.Value;
+                                    string fileName = Path.GetFileName(oldPath);
+                                    
+                                    Domain.Files.UploadedFile? uploadedFile = await dbContext.UploadedFiles
+                                        .FirstOrDefaultAsync(uf => uf.StoredFileName == fileName, cancellationToken);
+
+                                    FileValidationResult? fileValidationResult = await dbContext.FileValidationResults
+                                        .FirstOrDefaultAsync(fvr => fvr.Filename == fileName && fvr.SessionId == sessionId, cancellationToken);
+
+                                    if (uploadedFile is not null && fileValidationResult is not null)
+                                    {
+                                        // Update the physical path
+                                        uploadedFile.PhysicalPath = newPath;
+                                        uploadedFile.StoredFileName = Path.GetFileName(newPath);
+                                        logger.LogInformation("Updated PhysicalPath for file {FileName} from {OldPath} to {NewPath}", 
+                                            fileName, oldPath, newPath);
+
+                                        fileValidationResult.Filename = Path.GetFileName(newPath);
+                                        logger.LogInformation("Updated PhysicalPath for fileValidationResult {FileName} from {OldPath} to {NewPath}",
+                                            fileName, oldPath, newPath);
+                                    }
+                                }
+                                
+                                // Save changes to database
+                                await dbContext.SaveChangesAsync(cancellationToken);
+                                logger.LogInformation("Successfully updated {Count} UploadedFile records with new paths", 
+                                    movementResult.Value.MovedFiles.Count);
                             }
                         }
                         catch (Exception ex)

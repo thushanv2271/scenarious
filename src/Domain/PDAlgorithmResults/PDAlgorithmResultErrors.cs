@@ -23,9 +23,9 @@ public static class PDAlgorithmResultErrors
         "PDAlgorithmResult.InvalidSegment",
         $"Segment '{segment}' was not found");
 
-    public static Error InvalidMethodology(string methodology) => Error.Validation(
+    public static Error InvalidMethodology(string methodology, List<string> availableMethodologies) => Error.Validation(
         "PDAlgorithmResult.InvalidMethodology",
-        $"Invalid methodology '{methodology}'. Valid values are: method1, method2, method3");
+        $"Invalid methodology '{methodology}'. Available methodologies are: {string.Join(", ", availableMethodologies)}");
 
     public static Error UpdateFailed(string message) => Error.Failure(
         "PDAlgorithmResult.UpdateFailed",

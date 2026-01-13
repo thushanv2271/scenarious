@@ -13,6 +13,7 @@ namespace Application.PDAlgorithmResults.UpdateSelectedMethodology;
 /// <summary>
 /// Handler to update the selected methodology for a specific product category and segment
 /// selectedMethodology is stored at segment level (outside summary)
+/// Validates methodology against available methods in the database JSON
 /// </summary>
 internal sealed class UpdateSelectedMethodologyCommandHandler(
     IApplicationDbContext context,
@@ -20,8 +21,6 @@ internal sealed class UpdateSelectedMethodologyCommandHandler(
     ILogger<UpdateSelectedMethodologyCommandHandler> logger)
     : ICommandHandler<UpdateSelectedMethodologyCommand, UpdateSelectedMethodologyResponse>
 {
-    private static readonly string[] ValidMethodologies = { "method1", "method2", "method3" };
-
     public async Task<Result<UpdateSelectedMethodologyResponse>> Handle(
         UpdateSelectedMethodologyCommand command,
         CancellationToken cancellationToken)
@@ -29,13 +28,6 @@ internal sealed class UpdateSelectedMethodologyCommandHandler(
         logger.LogInformation(
             "Updating selected methodology for PD Result {Id}, Category: {Category}, Segment: {Segment}",
             command.Id, command.ProductCategory, command.Segment);
-
-        // Validate methodology
-        if (!ValidMethodologies.Contains(command.SelectedMethodology, StringComparer.OrdinalIgnoreCase))
-        {
-            return Result.Failure<UpdateSelectedMethodologyResponse>(
-                PDAlgorithmResultErrors.InvalidMethodology(command.SelectedMethodology));
-        }
 
         // Retrieve the PD Algorithm Result
         PDAlgorithmResult? result = await context.PDAlgorithmResults
@@ -57,17 +49,40 @@ internal sealed class UpdateSelectedMethodologyCommandHandler(
                 PDAlgorithmResultErrors.UpdateFailed("Failed to parse stored JSON data"));
         }
 
-        // Find and update the specific segment's selectedMethodology
-        Result<bool> updateResult = UpdateSelectedMethodologyInJson(
-            rootNode,
-            command.ProductCategory,
-            command.Segment,
-            command.SelectedMethodology);
+        // Find and validate the specific segment's available methodologies
+        Result<(JsonObject targetSegment, List<string> availableMethodologies)> findResult =
+            FindSegmentAndAvailableMethodologies(
+                rootNode,
+                command.ProductCategory,
+                command.Segment);
 
-        if (updateResult.IsFailure)
+        if (findResult.IsFailure)
         {
-            return Result.Failure<UpdateSelectedMethodologyResponse>(updateResult.Error);
+            return Result.Failure<UpdateSelectedMethodologyResponse>(findResult.Error);
         }
+
+        (JsonObject targetSegment, List<string> availableMethodologies) = findResult.Value;
+
+        // Validate that the selected methodology exists in available methodologies
+        if (!availableMethodologies.Contains(command.SelectedMethodology, StringComparer.OrdinalIgnoreCase))
+        {
+            logger.LogWarning(
+                "Invalid methodology '{Methodology}' for Category: {Category}, Segment: {Segment}. Available: [{Available}]",
+                command.SelectedMethodology, command.ProductCategory, command.Segment,
+                string.Join(", ", availableMethodologies));
+
+            return Result.Failure<UpdateSelectedMethodologyResponse>(
+                PDAlgorithmResultErrors.InvalidMethodology(
+                    command.SelectedMethodology,
+                    availableMethodologies));
+        }
+
+        // Update selectedMethodology at SEGMENT level
+        targetSegment["selectedMethodology"] = command.SelectedMethodology;
+
+        logger.LogDebug(
+            "Updated selectedMethodology to '{Methodology}' at segment level for Category: {Category}, Segment: {Segment}",
+            command.SelectedMethodology, command.ProductCategory, command.Segment);
 
         // Serialize updated JSON back to string
         string updatedJson = rootNode.ToJsonString(new JsonSerializerOptions
@@ -95,16 +110,18 @@ internal sealed class UpdateSelectedMethodologyCommandHandler(
         });
     }
 
-    private Result<bool> UpdateSelectedMethodologyInJson(
+    /// <summary>
+    /// Finds the target segment and extracts available methodologies from its summary
+    /// </summary>
+    private Result<(JsonObject targetSegment, List<string> availableMethodologies)> FindSegmentAndAvailableMethodologies(
         JsonNode rootNode,
         string productCategory,
-        string segment,
-        string selectedMethodology)
+        string segment)
     {
         JsonArray? productCategories = rootNode["productCategories"]?.AsArray();
         if (productCategories is null)
         {
-            return Result.Failure<bool>(
+            return Result.Failure<(JsonObject, List<string>)>(
                 PDAlgorithmResultErrors.UpdateFailed("Invalid JSON structure: productCategories not found"));
         }
 
@@ -122,7 +139,7 @@ internal sealed class UpdateSelectedMethodologyCommandHandler(
 
         if (targetCategory is null)
         {
-            return Result.Failure<bool>(
+            return Result.Failure<(JsonObject, List<string>)>(
                 PDAlgorithmResultErrors.InvalidProductCategory(productCategory));
         }
 
@@ -130,7 +147,7 @@ internal sealed class UpdateSelectedMethodologyCommandHandler(
         JsonArray? segments = targetCategory["segments"]?.AsArray();
         if (segments is null)
         {
-            return Result.Failure<bool>(
+            return Result.Failure<(JsonObject, List<string>)>(
                 PDAlgorithmResultErrors.UpdateFailed("Invalid JSON structure: segments not found"));
         }
 
@@ -147,17 +164,54 @@ internal sealed class UpdateSelectedMethodologyCommandHandler(
 
         if (targetSegment is null)
         {
-            return Result.Failure<bool>(
+            return Result.Failure<(JsonObject, List<string>)>(
                 PDAlgorithmResultErrors.InvalidSegment(segment));
         }
 
-        // UPDATE: selectedMethodology now goes at SEGMENT level (not inside summary)
-        targetSegment["selectedMethodology"] = selectedMethodology;
+        // Extract available methodologies from the summary
+        List<string> availableMethodologies = ExtractAvailableMethodologies(targetSegment);
+
+        if (availableMethodologies.Count == 0)
+        {
+            logger.LogWarning(
+                "No methodologies found in summary for Category: {Category}, Segment: {Segment}",
+                productCategory, segment);
+
+            return Result.Failure<(JsonObject, List<string>)>(
+                PDAlgorithmResultErrors.UpdateFailed(
+                    $"No methodologies available for product category '{productCategory}' and segment '{segment}'"));
+        }
 
         logger.LogDebug(
-            "Updated selectedMethodology to '{Methodology}' at segment level for Category: {Category}, Segment: {Segment}",
-            selectedMethodology, productCategory, segment);
+            "Found {Count} available methodologies for Category: {Category}, Segment: {Segment}: [{Methodologies}]",
+            availableMethodologies.Count, productCategory, segment, string.Join(", ", availableMethodologies));
 
-        return Result.Success(true);
+        return Result.Success((targetSegment, availableMethodologies));
+    }
+
+    /// <summary>
+    /// Extracts available methodology names from the segment's summary
+    /// </summary>
+    private static List<string> ExtractAvailableMethodologies(JsonObject segmentNode)
+    {
+        List<string> methodologies = new();
+
+        JsonObject? summary = segmentNode["summary"]?.AsObject();
+        if (summary is null)
+        {
+            return methodologies;
+        }
+
+        // Check for each potential methodology in the summary
+        foreach (KeyValuePair<string, JsonNode?> property in summary)
+        {
+            // Verify that the property has actual method data (not null)
+            if (property.Value is JsonObject)
+            {
+                methodologies.Add(property.Key);
+            }
+        }
+
+        return methodologies;
     }
 }

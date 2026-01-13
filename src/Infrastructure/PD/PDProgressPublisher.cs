@@ -59,7 +59,15 @@ internal sealed class PDProgressPublisher : IPDProgressPublisher
             return;
         }
 
-        // Create message with the specified statu
+        // Update the record in the database
+        record.Status = status;
+        record.Message = errorMessage;
+        record.UpdatedAt = DateTime.UtcNow;
+        record.UpdatedBy = "system"; // TODO: get from user context
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Create message with the specified status
         PDProgressMessage message = new(
             SessionId: sessionId,
             StepOrder: stepOrder,
@@ -127,5 +135,29 @@ internal sealed class PDProgressPublisher : IPDProgressPublisher
         {
             _logger.LogError(ex, "Failed to publish message to Redis for SessionId: {SessionId}", message.SessionId);
         }
+    }
+
+    /// <summary>
+    /// Marks all in-progress tasks for the given session as failed
+    /// </summary>
+    public async Task MarkInProgressAsFailedAsync(Guid sessionId, string errorMessage, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Marking all in-progress tasks as failed for SessionId: {SessionId}", sessionId);
+
+        List<PDProgressTracking> inProgressRecords = await _context.PDProgressTrackings
+            .Where(p => p.SessionId == sessionId && p.Status == PDProgressStatus.InProgress && p.IsActive)
+            .ToListAsync(cancellationToken);
+
+        foreach (PDProgressTracking record in inProgressRecords)
+        {
+            record.Status = PDProgressStatus.Error;
+            record.Message = errorMessage;
+            record.UpdatedAt = DateTime.UtcNow;
+            record.UpdatedBy = "system"; // or get from user context if available
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Marked {Count} in-progress tasks as failed for SessionId: {SessionId}", inProgressRecords.Count, sessionId);
     }
 }

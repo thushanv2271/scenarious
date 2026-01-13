@@ -6,5 +6,6 @@ public sealed record FileValidationResultResponse(
     int TotalRows,
     int TotalErrors,
     string Status,
-    string? PhysicalPath
+    string? PhysicalPath,
+    Guid? UploadedFileId
 );

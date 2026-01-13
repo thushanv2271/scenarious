@@ -44,6 +44,11 @@ public interface IPDCalculationService
         string createdBy,
         CancellationToken cancellationToken = default);
 
+    Task<Result<IReadOnlyList<PdMigrationDataset>>> GetStep2DatasetAsync(
+        TimeConfig timeConfig,
+        List<DatePassedDueBucket> datePassedDueBuckets,
+        List<PDConfiguration> pdConfiguration,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Executes step 3 of PD calculation: Generate PD Summary tables from migration matrices

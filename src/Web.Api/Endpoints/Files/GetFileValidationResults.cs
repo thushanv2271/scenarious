@@ -15,9 +15,11 @@ internal sealed class GetFileValidationResults : IEndpoint
             CancellationToken cancellationToken,
             int pageNumber = 1,
             int pageSize = 10,
-            string? status = null) =>
+            string? status = null,
+            string? collectiveImpairmentType = null,
+            string? timePeriod = null) =>
         {
-            var query = new GetFileValidationResultsQuery(pageNumber, pageSize, status);
+            var query = new GetFileValidationResultsQuery(pageNumber, pageSize, status, collectiveImpairmentType, timePeriod);
             Result<PaginatedResult<FileValidationResultResponse>> result = await handler.Handle(query, cancellationToken);
 
             return result.Match(
@@ -36,6 +38,6 @@ internal sealed class GetFileValidationResults : IEndpoint
         .WithTags("Files")
         .WithName("GetFileValidationResults")
         .WithSummary("Get file validation results")
-        .WithDescription("Retrieves paginated list of file validation results with statistics. Status filter options: all, valid, invalid");
+        .WithDescription("Retrieves paginated list of file validation results with statistics. Status filter options: all, valid, invalid. Can filter by CollectiveImpairmentType and TimePeriod based on file paths.");
     }
 }

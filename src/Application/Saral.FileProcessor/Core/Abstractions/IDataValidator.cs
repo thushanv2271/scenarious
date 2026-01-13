@@ -6,6 +6,11 @@ public interface IColumnValidator
     ValidationResult Validate(object? value, int rowIndex);
 }
 
+public interface IRowAwareColumnValidator : IColumnValidator
+{
+    ValidationResult Validate(object? value, int rowIndex, IReadOnlyDictionary<string, object?> rowData);
+}
+
 public interface IDataValidator
 {
     ValidationSummary ValidateData(FileLoadContext loadContext);

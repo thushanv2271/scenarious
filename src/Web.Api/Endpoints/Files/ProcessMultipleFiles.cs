@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Application.Abstractions.Messaging;
 using Application.Files.ProcessMultipleFiles;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
@@ -22,10 +23,13 @@ internal sealed class ProcessMultipleFiles : IEndpoint
         app.MapPost("/files/process-multiple", async (
             HttpContext httpContext,
             ICommandHandler<ProcessMultipleFilesCommand, ProcessMultipleFilesResponse> handler,
+            ILogger<ProcessMultipleFiles> logger,
             string collectiveImpairmentType,
             string timePeriod,
             CancellationToken cancellationToken) =>
         {
+            logger.LogInformation("ProcessMultipleFiles request received - CollectiveImpairmentType: {CollectiveImpairmentType}, TimePeriod: {TimePeriod}", collectiveImpairmentType, timePeriod);
+            
             // Validate parameters
             if (string.IsNullOrWhiteSpace(collectiveImpairmentType))
             {
@@ -53,7 +57,9 @@ internal sealed class ProcessMultipleFiles : IEndpoint
                 TimePeriod: timePeriod
             );
 
+            logger.LogInformation("ProcessMultipleFiles dispatching command to handler");
             Result<ProcessMultipleFilesResponse> result = await handler.Handle(command, cancellationToken);
+            logger.LogInformation("ProcessMultipleFiles handler completed - Success: {IsSuccess}", result.IsSuccess);
 
             return result.Match(
                 data => Results.Ok(data),

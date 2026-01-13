@@ -24,5 +24,7 @@ public sealed record GetPDProgressResponse(
     IReadOnlyList<PDProgressDto> ProgressData,
     bool IsNewlyCreated,
     bool IsRerun,
-    Guid SessionId
+    Guid SessionId,
+    bool IsComplete,
+    bool IsError
 );

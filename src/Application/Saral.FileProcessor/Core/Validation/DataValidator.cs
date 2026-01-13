@@ -27,6 +27,26 @@ public class DataValidator : IDataValidator
         ArgumentNullException.ThrowIfNull(loadContext);
 
         Frame<int, string> frame = loadContext.Data;
+        
+        // Check if the validation column already exists and remove it from validation
+        bool hasExistingValidationColumn = frame.ColumnKeys.Contains(ValidationColumnName);
+        Frame<int, string> frameToValidate = frame;
+        
+        if (hasExistingValidationColumn)
+        {
+            // Remove existing validation column before validation to avoid duplication
+            var columnsToKeep = frame.ColumnKeys.Where(c => !c.Equals(ValidationColumnName, StringComparison.OrdinalIgnoreCase)).ToList();
+            var seriesList = new List<KeyValuePair<string, Series<int, object?>>>();
+            
+            foreach (string column in columnsToKeep)
+            {
+                Series<int, object?> columnSeries = frame.GetColumn<object?>(column);
+                seriesList.Add(new KeyValuePair<string, Series<int, object?>>(column, columnSeries));
+            }
+            
+            frameToValidate = Frame.FromColumns(seriesList);
+        }
+        
         var rowValidations = new List<RowValidation>();
 
         // Reset any stateful validators (like UniqueValidator)
@@ -36,9 +56,9 @@ public class DataValidator : IDataValidator
         }
 
         // First pass: Validate each row
-        foreach (int rowKey in frame.RowKeys.OrderBy(x => x))
+        foreach (int rowKey in frameToValidate.RowKeys.OrderBy(x => x))
         {
-            IReadOnlyDictionary<string, object?> rowValues = FrameUtilities.CaptureRowValues(frame, rowKey);
+            IReadOnlyDictionary<string, object?> rowValues = FrameUtilities.CaptureRowValues(frameToValidate, rowKey);
             var columnValidations = new Dictionary<string, ValidationResult>();
 
             // Apply validators for this row
@@ -47,7 +67,12 @@ public class DataValidator : IDataValidator
                 if (rowValues.ContainsKey(validator.ColumnName))
                 {
                     object? value = rowValues[validator.ColumnName];
-                    ValidationResult result = validator.Validate(value, rowKey);
+                    
+                    // Check if the validator is row-aware and call the appropriate method
+                    ValidationResult result = validator is IRowAwareColumnValidator rowAwareValidator
+                        ? rowAwareValidator.Validate(value, rowKey, rowValues)
+                        : validator.Validate(value, rowKey);
+                    
                     columnValidations[validator.ColumnName] = result;
                 }
             }
@@ -65,9 +90,9 @@ public class DataValidator : IDataValidator
                 var valueGroups = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
                 
                 // Group rows by column value
-                foreach (int rowKey in frame.RowKeys.OrderBy(x => x))
+                foreach (int rowKey in frameToValidate.RowKeys.OrderBy(x => x))
                 {
-                    IReadOnlyDictionary<string, object?> rowValues = FrameUtilities.CaptureRowValues(frame, rowKey);
+                    IReadOnlyDictionary<string, object?> rowValues = FrameUtilities.CaptureRowValues(frameToValidate, rowKey);
                     if (rowValues.ContainsKey(columnName))
                     {
                         string value = rowValues[columnName]?.ToString()?.Trim() ?? string.Empty;
@@ -109,7 +134,7 @@ public class DataValidator : IDataValidator
         var validationArray = rowValidations.ToImmutableArray();
 
         // Always create a modified data frame with validation messages column
-        Frame<int, string> modifiedData = CreateDataFrameWithValidationColumn(frame, validationArray);
+        Frame<int, string> modifiedData = CreateDataFrameWithValidationColumn(frameToValidate, validationArray);
 
         return new ValidationSummary(validationArray, modifiedData);
     }
@@ -118,22 +143,13 @@ public class DataValidator : IDataValidator
         Frame<int, string> originalFrame, 
         ImmutableArray<RowValidation> rowValidations)
     {
-        // Get all original columns
+        // Get all original columns (validation column already removed if it existed)
         var originalColumns = originalFrame.ColumnKeys.ToList();
-
-        // Check if validation column already exists and remove it if it does
-        bool validationColumnExists = originalColumns.Contains(ValidationColumnName);
-        if (validationColumnExists)
-        {
-            originalColumns.Remove(ValidationColumnName);
-        }
-        
-        //var newColumns = new List<string>(originalColumns) { ValidationColumnName };
 
         // Create series list preserving the original row order
         var seriesList = new List<KeyValuePair<string, Series<int, object?>>>();
         
-        // Add original columns maintaining row order (excluding existing validation column)
+        // Add original columns maintaining row order
         foreach (string? column in originalColumns)
         {
             Series<int, object?> columnSeries = originalFrame.GetColumn<object?>(column);
@@ -149,7 +165,7 @@ public class DataValidator : IDataValidator
             seriesList.Add(new KeyValuePair<string, Series<int, object?>>(column, builder.Series));
         }
 
-        // Add validation messages column maintaining row order
+        // Add NEW validation messages column maintaining row order
         var validationBuilder = new SeriesBuilder<int, object?>();
         var validationDict = rowValidations.ToDictionary(rv => rv.RowIndex, rv => rv.ValidationMessage ?? string.Empty);
         

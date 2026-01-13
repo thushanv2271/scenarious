@@ -16,4 +16,6 @@ public class AppConfiguration : IAppConfiguration
 	public string UserExportPath => _configuration["UserExportPath"]!;
 	public string HostingType => _configuration["HostingType"]!;
 	public string PDFilesPath => _configuration["PDFilesPath"]!;
+	public string LGD_ClosedFacilityFilesPath => _configuration["ProcessedFilePaths:LGD_ClosedFacility"]!;
+	public string LGD_OpenFacilityFilesPath => _configuration["ProcessedFilePaths:LGD_OpenFacility"]!;
 }

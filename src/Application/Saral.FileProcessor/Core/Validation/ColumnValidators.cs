@@ -184,26 +184,25 @@ public class BooleanValidator : IColumnValidator
     }
 }
 
-public class ConditionalNotEmptyValidator : IColumnValidator
+public class ConditionalNotEmptyValidator : IRowAwareColumnValidator
 {
     public string ColumnName { get; }
-    //private readonly string _conditionColumn;
-    //private readonly string _conditionValue;
-    //private readonly bool _allowEmptyWhenConditionMet;
+    private readonly string _conditionColumn;
+    private readonly string _conditionValue;
+    private readonly bool _allowEmptyWhenConditionMet;
 
     public ConditionalNotEmptyValidator(string columnName, string conditionColumn, string conditionValue, bool allowEmptyWhenConditionMet = true)
     {
         ColumnName = columnName ?? throw new ArgumentNullException(nameof(columnName));
-        //_conditionColumn = conditionColumn ?? throw new ArgumentNullException(nameof(conditionColumn));
-        //_conditionValue = conditionValue ?? throw new ArgumentNullException(nameof(conditionValue));
-        //_allowEmptyWhenConditionMet = allowEmptyWhenConditionMet;
+        _conditionColumn = conditionColumn ?? throw new ArgumentNullException(nameof(conditionColumn));
+        _conditionValue = conditionValue ?? throw new ArgumentNullException(nameof(conditionValue));
+        _allowEmptyWhenConditionMet = allowEmptyWhenConditionMet;
     }
 
     public ValidationResult Validate(object? value, int rowIndex)
     {
-        // This validator needs access to the entire row data to check conditions
-        // For now, we'll implement basic not empty validation
-        // The conditional logic should be implemented at a higher level
+        // This method is required by IColumnValidator interface but won't be used
+        // when the validator is invoked through IRowAwareColumnValidator
         if (value is null || string.IsNullOrWhiteSpace(value.ToString()))
         {
             return new ValidationResult(false, $"Column '{ColumnName}' cannot be empty");
@@ -211,29 +210,109 @@ public class ConditionalNotEmptyValidator : IColumnValidator
 
         return new ValidationResult(true);
     }
+
+    public ValidationResult Validate(object? value, int rowIndex, IReadOnlyDictionary<string, object?> rowData)
+    {
+        // Check if the condition column exists and matches the condition value
+        bool conditionMet = rowData.TryGetValue(_conditionColumn, out object? conditionColValue) &&
+                           conditionColValue?.ToString()?.Equals(_conditionValue, StringComparison.OrdinalIgnoreCase) == true;
+
+        bool isEmpty = value is null || string.IsNullOrWhiteSpace(value.ToString());
+
+        // If condition is met and we allow empty when condition is met, then empty is valid
+        if (conditionMet && _allowEmptyWhenConditionMet)
+        {
+            return new ValidationResult(true);
+        }
+
+        // If condition is not met and we allow empty when condition is met, then empty is invalid
+        if (!conditionMet && _allowEmptyWhenConditionMet && isEmpty)
+        {
+            return new ValidationResult(false, $"Column '{ColumnName}' cannot be empty when '{_conditionColumn}' is not '{_conditionValue}'");
+        }
+
+        // If condition is met and we don't allow empty when condition is met, then empty is invalid
+        if (conditionMet && !_allowEmptyWhenConditionMet && isEmpty)
+        {
+            return new ValidationResult(false, $"Column '{ColumnName}' cannot be empty when '{_conditionColumn}' is '{_conditionValue}'");
+        }
+
+        // Value is not empty, so it's valid
+        if (!isEmpty)
+        {
+            return new ValidationResult(true);
+        }
+
+        return new ValidationResult(false, $"Column '{ColumnName}' cannot be empty");
+    }
 }
 
-public class DependentValidator : IColumnValidator
+public class DependentValidator : IRowAwareColumnValidator
 {
     public string ColumnName { get; }
-    //private readonly string _dependentColumn;
-    //private readonly string _requiredValue;
+    private readonly string _dependentColumn;
+    private readonly string _requiredValue;
 
     public DependentValidator(string columnName, string dependentColumn, string requiredValue)
     {
         ColumnName = columnName ?? throw new ArgumentNullException(nameof(columnName));
-        //_dependentColumn = dependentColumn ?? throw new ArgumentNullException(nameof(dependentColumn));
-        //_requiredValue = requiredValue ?? throw new ArgumentNullException(nameof(requiredValue));
+        _dependentColumn = dependentColumn ?? throw new ArgumentNullException(nameof(dependentColumn));
+        _requiredValue = requiredValue ?? throw new ArgumentNullException(nameof(requiredValue));
     }
 
     public ValidationResult Validate(object? value, int rowIndex)
     {
-        // This validator needs access to the entire row data to check dependencies
-        // For now, we'll implement basic not empty validation
-        // The dependency logic should be implemented at a higher level
+        // This method is required by IColumnValidator interface but won't be used
+        // when the validator is invoked through IRowAwareColumnValidator
         if (value is null || string.IsNullOrWhiteSpace(value.ToString()))
         {
             return new ValidationResult(false, $"Column '{ColumnName}' cannot be empty");
+        }
+
+        return new ValidationResult(true);
+    }
+
+    public ValidationResult Validate(object? value, int rowIndex, IReadOnlyDictionary<string, object?> rowData)
+    {
+        // Check if the dependent column has the required value
+        bool dependencyMet = rowData.TryGetValue(_dependentColumn, out object? dependentColValue) &&
+                            dependentColValue?.ToString()?.Equals(_requiredValue, StringComparison.OrdinalIgnoreCase) == true;
+
+        // If dependency is met, the field is required and cannot be empty
+        if (dependencyMet && (value is null || string.IsNullOrWhiteSpace(value.ToString())))
+        {
+            return new ValidationResult(false, $"Column '{ColumnName}' is required when '{_dependentColumn}' is '{_requiredValue}'");
+        }
+
+        return new ValidationResult(true);
+    }
+}
+
+public class ReferenceDataValidator : IColumnValidator
+{
+    public string ColumnName { get; }
+    private readonly HashSet<string> _validValues;
+
+    public ReferenceDataValidator(string columnName, IEnumerable<string> validValues)
+    {
+        ColumnName = columnName ?? throw new ArgumentNullException(nameof(columnName));
+        ArgumentNullException.ThrowIfNull(validValues);
+        _validValues = new HashSet<string>(validValues, StringComparer.OrdinalIgnoreCase);
+    }
+
+    public ValidationResult Validate(object? value, int rowIndex)
+    {
+        if (value is null || string.IsNullOrWhiteSpace(value.ToString()))
+        {
+            return new ValidationResult(true);
+        }
+
+        string stringValue = value.ToString()!.Trim();
+
+        if (!_validValues.Contains(stringValue))
+        {
+            return new ValidationResult(false, 
+                $"Column {ColumnName} contains an invalid value: \"{stringValue}\". Please use a valid {ColumnName}");
         }
 
         return new ValidationResult(true);
